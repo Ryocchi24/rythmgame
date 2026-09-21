@@ -51,5 +51,7 @@
 
 1. ~~絵のクオリティアップ~~（2026-09-21 済：A案＝Canvas のまま描き込み、太い線の漫画風で3ゲームとも）
    - 残り：メニュー・説明画面の SVG アイコンは まだ前のタッチのまま
-2. **GitHub に載せて GitHub Pages で公開**（リポジトリ作成 → push → Settings > Pages で main ブランチ / root を公開）
+2. ~~GitHub に載せて GitHub Pages で公開~~（2026-09-21 済）
+   - リポジトリ：https://github.com/Ryocchi24/rythmgame （public）
+   - 公開URL：https://ryocchi24.github.io/rythmgame/ （main ブランチ / root。push すると数分で反映）
 3. （あれば）2人で交代して遊ぶ協力モード、PWA 化（ホーム画面に追加でアプリっぽく）
