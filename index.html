@@ -355,6 +355,25 @@
     s.connect(f); f.connect(gn); gn.connect(master); s.start(t); s.stop(t + dur + .02);
   }
   const midi = (m) => 440 * Math.pow(2, (m - 69) / 12);
+  // こえ（フォルマント合成）：「p」の はれつ音 ＋ ブザー音を 母音の ひびき（F1〜F3）に とおす
+  const VOWEL = { a: [[850, 1], [1250, .7], [2800, .25]], i: [[300, 1], [2350, .5], [3100, .3]], u: [[350, 1], [1350, .5], [2500, .2]], e: [[500, 1], [1950, .6], [2700, .25]], o: [[500, 1], [850, .8], [2700, .15]] };
+  const VOWEL_NORM = { a: .55, i: .14, u: .16, e: .35, o: .16 }; // 母音ごとの 音量を そろえる（はかって 決めた）
+  function voice(t, vowel, f0, dur, { gain = .5, plosive = true } = {}) {
+    if (plosive) noise(t, .012, { gain: gain * .9, type: "bandpass", freq: 1200, q: .8 });
+    const v0 = t + (plosive ? .012 : 0), end = v0 + dur;
+    const src = ac.createOscillator(), env = ac.createGain();
+    src.type = "sawtooth";
+    src.frequency.setValueAtTime(f0 * 1.06, v0); src.frequency.exponentialRampToValueAtTime(f0, v0 + .05); src.frequency.exponentialRampToValueAtTime(f0 * .94, end);
+    env.gain.setValueAtTime(0.0001, v0); env.gain.exponentialRampToValueAtTime(1, v0 + .012);
+    env.gain.setValueAtTime(1, v0 + dur * .45); env.gain.exponentialRampToValueAtTime(0.0001, end);
+    src.connect(env);
+    VOWEL[vowel].forEach(([f, a]) => {
+      const bp = ac.createBiquadFilter(), gn = ac.createGain();
+      bp.type = "bandpass"; bp.frequency.value = f; bp.Q.value = f / 90;
+      gn.gain.value = a * gain * 4 * VOWEL_NORM[vowel]; env.connect(bp); bp.connect(gn); gn.connect(master);
+    });
+    src.start(v0); src.stop(end + .02);
+  }
   const SND = {
     click: (t, acc) => tone(t, acc ? 1760 : 1175, .06, { type: "square", gain: .12 }),
     kick: (t, v = 1) => tone(t, 130, .16, { f1: 42, gain: .55 * v }),
@@ -1315,7 +1334,12 @@ function songBgm(ev, t0, beat, nBars, style) {
     ];
     let jumpAt = -9, lastBonk = -9, L = null;
     const snd = {
-      syl: (t, k) => { const m = [72, 74, 76, 79][k]; noise(t, .02, { gain: .25, type: "bandpass", freq: 3000, q: 2 }); tone(t, midi(m) * 1.06, .1, { type: "square", f1: midi(m), gain: .09 }); tone(t, midi(m), .12, { type: "triangle", gain: .22 }); },
+      // パ・ピ・プ・ペ・ポ を こえで（音の高さも すこしずつ 上がる）。うしろに 小さく チャイム
+      syl: (t, k, spT) => {
+        const m = [72, 74, 76, 79, 84][k];
+        voice(t, "aiueo"[k], midi(m - 12), Math.min(.22, Math.max(.12, spT * .7)), { gain: k === 4 ? .6 : .5 });
+        tone(t + .012, midi(m), .1, { type: "triangle", gain: .07 });
+      },
       hop: (t) => tone(t, 500, .1, { f1: 900, gain: .08 }),
       jump: (t) => tone(t, 380, .16, { f1: 1100, gain: .28 }),
       kero: (t) => { tone(t + .03, 880, .05, { type: "square", f1: 700, gain: .08 }); tone(t + .1, 990, .07, { type: "square", f1: 760, gain: .08 }); tone(t + .05, midi(84), .25, { type: "triangle", gain: .15 }); },
@@ -1338,7 +1362,7 @@ function songBgm(ev, t0, beat, nBars, style) {
       }
       const endT = songEnd;
       songBgm(ev, t0, beat, nBars, "kaeru");
-      rings.forEach((r) => { r.cues.forEach((c, k) => ev.push({ t: c, fn: (t) => snd.syl(t, k) })); [2, 3].forEach((k) => ev.push({ t: r.cues[k] + .01, fn: snd.hop })); });
+      rings.forEach((r) => { r.cues.forEach((c, k) => ev.push({ t: c, fn: (t) => snd.syl(t, k, r.spT) })); ev.push({ t: r.t, fn: (t) => snd.syl(t, 4, r.spT) }); [2, 3].forEach((k) => ev.push({ t: r.cues[k] + .01, fn: snd.hop })); });
       ev.push({ t: endT, fn: (t) => { SND.kick(t); SND.fin(t); } });
       return { t0, beat, bar, e, notes: rings, endT, ev, nBars };
     }

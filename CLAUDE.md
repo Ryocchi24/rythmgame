@@ -22,7 +22,7 @@
 ### コードの地図（`<script>` 内）
 
 1. **共通エンジン**
-   - 音：`tone()` `noise()` `SND` `bgm()`（ループ伴奏） `songBgm(ev, t0, beat, nBars, style)`（Aメロ→Bメロ→サビの1曲。style = `"karate"` 短調 / `"kaeru"` 長調）
+   - 音：`tone()` `noise()` `voice(t, 母音, f0, dur)`（フォルマント合成の こえ。わくぐりの「パピプペポ」。母音ごとの音量は `VOWEL_NORM` で そろえてある） `SND` `bgm()`（ループ伴奏） `songBgm(ev, t0, beat, nBars, style)`（Aメロ→Bメロ→サビの1曲。style = `"karate"` 短調 / `"kaeru"` 長調）
    - 時間：すべて `AudioContext.currentTime` 基準。`vnow()`＝画面表示用（出力遅延を引く）、`inTime()`＝入力判定用（出力遅延＋タイミング補正を引く）。
    - スケジューラ：`chart.ev`（{t, fn}）を 25ms ごとに先読み 0.2 秒で鳴らす `pump()`。
    - 判定：`press()` / `release()`（長押し）/ `hit()` / `miss()`。判定窓は `JUDGE`。どのノーツにも当たらない押下は「からぶり」（`strays`、1回 `STRAY_PENALTY` 点減点）。
