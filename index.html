@@ -1,0 +1,1364 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#FFE9C9">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="description" content="きいて・みて・かぞえて あそぶ、子ども向けのリズムゲーム集">
+<title>リズムてんこもり</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Mochiy+Pop+One&family=M+PLUS+Rounded+1c:wght@500;700;800&display=swap">
+<style>
+  :root{
+    --bg:#FFE9C9; --btn:#FFC94A; --btn-dk:#D39A12; --floor:#6B3F1F;
+    --paper:#FFF8EE; --ink:#3A2413; --ink-soft:#7A5A40;
+    --good:#2F9E44; --ok:#1C7ED6; --meh:#E8590C; --bad:#868E96;
+    --display:"Mochiy Pop One","Hiragino Maru Gothic ProN","Arial Rounded MT Bold",sans-serif;
+    --body:"M PLUS Rounded 1c","Hiragino Maru Gothic ProN","Hiragino Sans",sans-serif;
+  }
+  [hidden]{display:none!important}
+  html,body{height:100%}
+  body{
+    background:var(--bg); color:var(--ink); font-family:var(--body);
+    overflow:hidden; touch-action:manipulation;
+    -webkit-user-select:none; user-select:none; -webkit-touch-callout:none;
+    -webkit-tap-highlight-color:transparent;
+  }
+  #app{height:100%; display:flex; flex-direction:column; max-width:720px; margin:0 auto; position:relative; background:var(--bg)}
+
+  .hud{display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:8px; padding:10px 16px 6px}
+  .hud .round, .combo{font-weight:800; font-size:13px; line-height:1.3; font-variant-numeric:tabular-nums; white-space:pre-line}
+  .combo{text-align:right}
+  .hud .right{display:flex; justify-content:flex-end; align-items:center; gap:10px}
+  .phase{
+    font-family:var(--display); font-size:22px; line-height:1; padding:8px 18px 9px;
+    background:var(--paper); border:3px solid var(--ink); border-radius:999px;
+    box-shadow:0 3px 0 var(--ink); min-width:7.5em; text-align:center; white-space:nowrap;
+    transition:transform .08s;
+  }
+  .phase.go{background:var(--btn)}
+  .phase.bump{transform:scale(1.12)}
+  .iconbtn{
+    width:36px; height:36px; border-radius:50%; border:3px solid var(--ink); background:var(--paper);
+    font:800 16px/1 var(--body); color:var(--ink); display:grid; place-items:center; cursor:pointer; padding:0; flex:none;
+  }
+  .iconbtn:focus-visible, .btn:focus-visible, .gamebtn:focus-visible{outline:3px solid var(--ok); outline-offset:3px}
+
+  .stage{flex:1; position:relative; min-height:0}
+  canvas{position:absolute; inset:0; width:100%; height:100%; display:block}
+
+  .pads{padding:14px 16px calc(14px + env(safe-area-inset-bottom,0px)); background:var(--floor); height:28%; min-height:140px; max-height:230px; display:flex}
+  .pad{
+    flex:1; border:4px solid var(--ink); border-radius:28px; background:var(--btn);
+    box-shadow:0 8px 0 var(--btn-dk), 0 8px 0 3px var(--ink); margin-bottom:10px;
+    font-family:var(--display); font-size:34px; color:var(--ink);
+    display:flex; flex-direction:column; align-items:center; justify-content:center; gap:4px;
+    touch-action:none; cursor:pointer; transition:transform .05s, box-shadow .05s;
+  }
+  .pad small{font-family:var(--body); font-weight:800; font-size:12px; letter-spacing:.06em; color:var(--ink)}
+  .pad.down{transform:translateY(7px); box-shadow:0 1px 0 var(--btn-dk), 0 1px 0 3px var(--ink)}
+
+  .overlay{position:absolute; inset:0; display:grid; place-items:center; padding:16px; background:rgba(58,36,19,.28); z-index:5; overflow-y:auto}
+  .card{
+    background:var(--paper); border:4px solid var(--ink); border-radius:24px; box-shadow:0 8px 0 var(--ink);
+    width:100%; max-width:420px; padding:22px 20px 20px; display:flex; flex-direction:column; gap:14px;
+  }
+  .card h1{font-family:var(--display); font-weight:400; font-size:32px; line-height:1.15; margin:0; text-wrap:balance; text-align:center}
+  .card h1 .pop{color:var(--btn); -webkit-text-stroke:1.5px var(--ink); paint-order:stroke fill}
+  .card h2{font-family:var(--display); font-weight:400; font-size:24px; margin:0; text-align:center}
+  .how{margin:0; padding:0; list-style:none; display:grid; gap:8px; font-size:15px; line-height:1.55; font-weight:700}
+  .how li{display:grid; grid-template-columns:30px 1fr; gap:8px; align-items:start}
+  .how .ic{width:30px; height:30px}
+  .row{display:flex; gap:10px}
+  .row > *{flex:1}
+  .btn{
+    font-family:var(--display); font-size:20px; color:var(--ink); padding:12px 10px 13px;
+    border:3px solid var(--ink); border-radius:16px; background:var(--btn); box-shadow:0 5px 0 var(--ink);
+    cursor:pointer; transition:transform .05s, box-shadow .05s;
+  }
+  .btn.sub{background:#fff; font-size:17px}
+  .btn:active, .gamebtn:active{transform:translateY(4px); box-shadow:0 1px 0 var(--ink)}
+  .note{font-size:12px; color:var(--ink-soft); text-align:center; margin:0; line-height:1.5; font-weight:700}
+  .back{background:none; border:0; font:800 14px var(--body); color:var(--ink-soft); cursor:pointer; padding:4px; align-self:center}
+
+  /* menu */
+  .menu-title{font-family:var(--display); font-size:34px; line-height:1.1; text-align:center; margin:0}
+  .menu-title span{display:block; font-size:15px; font-family:var(--body); font-weight:800; color:var(--ink-soft); margin-top:6px; letter-spacing:.06em}
+  .games{display:grid; gap:12px}
+  .gamebtn{
+    display:grid; grid-template-columns:64px 1fr; gap:12px; align-items:center; text-align:left;
+    border:3px solid var(--ink); border-radius:18px; box-shadow:0 5px 0 var(--ink); padding:10px 14px 10px 10px;
+    cursor:pointer; color:var(--ink); transition:transform .05s, box-shadow .05s;
+  }
+  .gamebtn svg{width:64px; height:64px}
+  .gamebtn b{display:block; font-family:var(--display); font-weight:400; font-size:21px; line-height:1.2}
+  .gamebtn .hs{display:inline-block; margin-top:6px; font-style:normal; font-weight:800; font-size:12px; background:rgba(255,255,255,.7); border:2px solid var(--ink); border-radius:999px; padding:2px 10px; font-variant-numeric:tabular-nums}
+  .newrec{margin:0; text-align:center; background:#FFF1B8; border:3px solid var(--ink); border-radius:16px; padding:10px 8px; animation:pop .5s cubic-bezier(.3,1.6,.5,1) both}
+  .newrec b{display:block; font-family:var(--display); font-weight:400; font-size:22px; color:#E0463C; line-height:1.2}
+  .newrec span{display:block; font-weight:800; font-size:13px; margin-top:4px}
+  @keyframes pop{from{transform:scale(.4); opacity:0} to{transform:scale(1); opacity:1}}
+  @media (prefers-reduced-motion: reduce){ .newrec{animation:none} }
+  .diffpick{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+  .diffpick button{border:3px solid var(--ink); border-radius:14px; background:#fff; padding:8px 4px; cursor:pointer; color:var(--ink); font-family:var(--body); box-shadow:0 3px 0 var(--ink)}
+  .diffpick button b{display:block; font-family:var(--display); font-weight:400; font-size:15px}
+  .diffpick button em{display:block; font-style:normal; font-weight:800; font-size:11px; margin-top:3px; color:var(--ink-soft); font-variant-numeric:tabular-nums}
+  .diffpick button[aria-checked=true]{background:var(--btn); transform:translateY(2px); box-shadow:0 1px 0 var(--ink)}
+  .diffpick button[aria-checked=true] em{color:var(--ink)}
+  .gamebtn .hsbox{grid-column:1 / -1; display:grid; grid-template-columns:auto repeat(3,1fr); gap:6px; align-items:stretch}
+  .gamebtn .hscap{font-family:var(--display); font-size:12px; line-height:1.15; display:grid; place-items:center; padding:0 2px; text-align:center}
+  .gamebtn .hscap::before{content:"★"; display:block; color:#E0A800; font-size:14px}
+  .gamebtn .hsbox i{font-style:normal; background:rgba(255,255,255,.85); border:2px solid var(--ink); border-radius:12px; padding:4px 2px 5px; text-align:center; display:grid; gap:1px}
+  .gamebtn .hsbox i small{font-size:10.5px; margin:0; font-weight:800; color:var(--ink-soft)}
+  .gamebtn .hsbox i strong{font-family:var(--display); font-weight:400; font-size:18px; line-height:1.1; font-variant-numeric:tabular-nums}
+  .gamebtn .hsbox i strong.none{color:#B9A58F}
+  .gamebtn small{display:block; font-weight:800; font-size:12.5px; line-height:1.4; margin-top:3px}
+
+  .field{display:grid; gap:6px}
+  .field > label, .field > .lab{font-weight:800; font-size:14px; display:flex; justify-content:space-between; gap:8px}
+  .field output{font-variant-numeric:tabular-nums; color:var(--ink-soft)}
+  .field .hint{font-size:12px; color:var(--ink-soft); font-weight:700; line-height:1.45}
+  input[type=range]{width:100%; accent-color:var(--btn-dk); height:28px}
+  .seg{display:grid; grid-auto-flow:column; grid-auto-columns:1fr; border:3px solid var(--ink); border-radius:12px; overflow:hidden}
+  .seg input{position:absolute; opacity:0; pointer-events:none}
+  .seg label{padding:9px 4px; text-align:center; font-weight:800; font-size:14px; cursor:pointer; background:#fff}
+  .seg input + label ~ label{border-left:2px solid var(--ink)}
+  .seg input:checked + label{background:var(--btn)}
+  .seg input:focus-visible + label{outline:3px solid var(--ok); outline-offset:-3px}
+  .check{display:flex; align-items:center; gap:10px; font-weight:800; font-size:14px}
+  .check input{width:22px; height:22px; accent-color:var(--btn-dk)}
+
+  .score{font-family:var(--display); font-size:56px; text-align:center; line-height:1; font-variant-numeric:tabular-nums}
+  .score small{font-size:22px}
+  .rank{font-family:var(--display); font-size:22px; text-align:center; color:var(--btn); -webkit-text-stroke:1px var(--ink); paint-order:stroke fill}
+  .tally{display:grid; grid-template-columns:repeat(5,1fr); gap:5px; text-align:center}
+  .tally div{border:2px solid var(--ink); border-radius:12px; padding:6px 2px; background:#fff}
+  .tally b{display:block; font-size:20px; font-variant-numeric:tabular-nums}
+  .tally span{font-size:11px; font-weight:800}
+
+  @media (prefers-reduced-motion: reduce){ .phase{transition:none} }
+</style>
+<style>
+  *,*::before,*::after{box-sizing:border-box}
+  body{margin:0}
+  :root{padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px)}
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="hud">
+    <div class="round" id="roundLbl"></div>
+    <div class="phase" id="phase">よーい</div>
+    <div class="right">
+      <div class="combo" id="combo"></div>
+      <button class="iconbtn" id="quitBtn" aria-label="やめる" hidden>✕</button>
+    </div>
+  </div>
+  <div class="stage" id="stage"><canvas id="cv"></canvas></div>
+  <div class="pads">
+    <div class="pad" id="pad" role="button" aria-label="ボタン"><span id="padLbl">おす！</span><small id="padSub"></small></div>
+  </div>
+
+  <!-- Menu -->
+  <div class="overlay" id="menuOv" style="background:#FFE9C9">
+    <div class="card">
+      <h1 class="menu-title">リズムてんこもり<span>あそぶ ゲームを えらんでね</span></h1>
+      <div class="games">
+        <button class="gamebtn" data-game="keneki" style="background:#FFD0DC">
+          <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#BFE9DF"/><path d="M8 62a24 24 0 0 1 48 0z" fill="#FFD3B4" stroke="#3A2413" stroke-width="3"/><path d="M22 42c-2-6 0-10-3-15M33 38c1-7-1-11 1-17M44 43c2-5 1-9 4-13" fill="none" stroke="#2A1A12" stroke-width="3" stroke-linecap="round"/><circle cx="24" cy="52" r="2.5" fill="#3A2413"/><circle cx="40" cy="52" r="2.5" fill="#3A2413"/></svg>
+          <span><b>けぬき名人</b><small>きいて まねして、リズムで プチッ！</small></span><span class="hsbox" data-hs="keneki"></span>
+        </button>
+        <button class="gamebtn" data-game="karate" style="background:#FFE39A">
+          <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#F4E6C8"/><path d="M14 24h18l-3 20H17z" fill="#D9774A" stroke="#3A2413" stroke-width="3" stroke-linejoin="round"/><rect x="11" y="19" width="24" height="7" rx="2" fill="#E88D5E" stroke="#3A2413" stroke-width="3"/><path d="M38 30l10-6M40 38l12 0M38 46l10 6" stroke="#3A2413" stroke-width="3" stroke-linecap="round"/></svg>
+          <span><b>カラテねこ</b><small>とんでくる ものを パンチで パカーン！</small></span><span class="hsbox" data-hs="karate"></span>
+        </button>
+        <button class="gamebtn" data-game="kaeru" style="background:#C9F0B4">
+          <svg viewBox="0 0 64 64" aria-hidden="true"><rect width="64" height="64" rx="14" fill="#CDEBFF"/><ellipse cx="44" cy="26" rx="7" ry="15" fill="none" stroke="#E0463C" stroke-width="5"/><ellipse cx="24" cy="44" rx="15" ry="11" fill="#6CC24A" stroke="#3A2413" stroke-width="3"/><circle cx="17" cy="33" r="6" fill="#fff" stroke="#3A2413" stroke-width="3"/><circle cx="30" cy="33" r="6" fill="#fff" stroke="#3A2413" stroke-width="3"/><circle cx="18" cy="33" r="2.5" fill="#3A2413"/><circle cx="31" cy="33" r="2.5" fill="#3A2413"/></svg>
+          <span><b>ケロっと わくぐり</b><small>「パピプペ…ポ！」で ジャンプ！</small></span><span class="hsbox" data-hs="kaeru"></span>
+        </button>
+      </div>
+      <p class="note">音が出ます。iPhoneはマナーモードを切ってね。</p>
+    </div>
+  </div>
+
+  <!-- Game title -->
+  <div class="overlay" id="titleOv" hidden>
+    <div class="card">
+      <h1 id="gTitle"></h1>
+      <ul class="how" id="gHow"></ul>
+      <div class="diffpick" id="diffPick" role="radiogroup" aria-label="むずかしさ">
+        <button data-diff="easy"><b>かんたん</b><em></em></button>
+        <button data-diff="normal"><b>ふつう</b><em></em></button>
+        <button data-diff="hard"><b>むずかしい</b><em></em></button>
+      </div>
+      <div class="row">
+        <button class="btn sub" id="toSettings">せってい</button>
+        <button class="btn" id="startBtn">あそぶ！</button>
+      </div>
+      <button class="back" id="toMenu">← ゲームを えらびなおす</button>
+    </div>
+  </div>
+
+  <!-- Settings -->
+  <div class="overlay" id="settingsOv" hidden>
+    <div class="card">
+      <h2 id="setTitle">せってい</h2>
+      <div class="field">
+        <label for="set-bpm">はやさ <output id="bpmOut"></output></label>
+        <input type="range" id="set-bpm" min="70" max="150" step="2">
+      </div>
+      <div class="field" hidden>
+        <div class="lab">リズムのむずかしさ</div>
+        <div class="seg" role="radiogroup">
+          <input type="radio" name="diff" id="diff-easy" value="easy"><label for="diff-easy">かんたん</label>
+          <input type="radio" name="diff" id="diff-normal" value="normal"><label for="diff-normal">ふつう</label>
+          <input type="radio" name="diff" id="diff-hard" value="hard"><label for="diff-hard">むずかしい</label>
+        </div>
+      </div>
+      <div class="field">
+        <div class="lab">タイミングのきびしさ</div>
+        <div class="seg" role="radiogroup">
+          <input type="radio" name="judge" id="judge-easy" value="easy"><label for="judge-easy">やさしい</label>
+          <input type="radio" name="judge" id="judge-normal" value="normal"><label for="judge-normal">ふつう</label>
+          <input type="radio" name="judge" id="judge-hard" value="hard"><label for="judge-hard">きびしい</label>
+        </div>
+      </div>
+      <div class="field">
+        <div class="lab">ながさ</div>
+        <div class="seg" role="radiogroup">
+          <input type="radio" name="rounds" id="rounds-6" value="6"><label for="rounds-6">みじかい</label>
+          <input type="radio" name="rounds" id="rounds-8" value="8"><label for="rounds-8">ふつう</label>
+          <input type="radio" name="rounds" id="rounds-12" value="12"><label for="rounds-12">ながい</label>
+        </div>
+      </div>
+      <div class="field" data-only="keneki">
+        <div class="lab">おてほんのあとの「せーの」</div>
+        <div class="seg" role="radiogroup">
+          <input type="radio" name="gap" id="gap-0" value="0"><label for="gap-0">なし</label>
+          <input type="radio" name="gap" id="gap-2" value="2"><label for="gap-2">みじかい</label>
+          <input type="radio" name="gap" id="gap-4" value="4"><label for="gap-4">ながい</label>
+        </div>
+      </div>
+      <label class="check" data-only="keneki"><input type="checkbox" id="set-guide"> けぬきのガイドを出す</label>
+      <div class="field">
+        <label for="set-offset">タイミング補正 <output id="offOut"></output></label>
+        <input type="range" id="set-offset" min="-150" max="250" step="10">
+        <div class="hint">ちゃんと合わせているのに判定がずれるときは＋に。Bluetoothイヤホンなら＋150前後が目安です。</div>
+      </div>
+      <p class="note">はやさ・ながさは ゲームごと・むずかしさごとに おぼえます。むずかしさは ゲームの さいしょの がめんで えらべます。</p>
+      <button class="btn" id="settingsDone">OK</button>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="overlay" id="resultOv" hidden>
+    <div class="card">
+      <h2>けっか はっぴょう</h2>
+      <div class="score" id="resScore">0<small>てん</small></div>
+      <div class="rank" id="resRank"></div>
+      <div class="newrec" id="resNew" hidden><b>ハイスコア たっせい！<br>おめでとう！</b><span id="resNewSub"></span></div>
+      <p class="note" id="resBest"></p>
+      <p class="note">かんけいない ところで おすと「からぶり」で へるよ。</p>
+      <div class="tally">
+        <div><b id="tBacchiri" style="color:var(--good)">0</b><span>バッチリ</span></div>
+        <div><b id="tOk" style="color:var(--ok)">0</b><span>OK</span></div>
+        <div><b id="tOshii" style="color:var(--meh)">0</b><span>おしい</span></div>
+        <div><b id="tMiss" style="color:var(--bad)">0</b><span>ミス</span></div>
+        <div><b id="tStray" style="color:var(--bad)">0</b><span>からぶり</span></div>
+      </div>
+      <div class="row">
+        <button class="btn sub" id="resSettings">せってい</button>
+        <button class="btn" id="retryBtn">もういちど</button>
+      </div>
+      <button class="back" id="resMenu">← ゲームを えらびなおす</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  // =====================================================================
+  //  共通エンジン
+  // =====================================================================
+  const GDEF = { bpm: 96, diff: "easy", rounds: 8 };
+  const DEFAULTS = { judge: "easy", offset: 0, gap: 4, guide: true, per: { keneki: { ...GDEF }, karate: { ...GDEF }, kaeru: { ...GDEF } } };
+  let S = JSON.parse(JSON.stringify(DEFAULTS));
+  try {
+    const raw = localStorage.getItem("tenkomori-settings");
+    if (raw) { const o = JSON.parse(raw); S = { ...S, ...o, per: { ...S.per, ...(o.per || {}) } }; }
+  } catch (e) {}
+  const save = () => { try { localStorage.setItem("tenkomori-settings", JSON.stringify(S)); } catch (e) {} };
+  let HS = {};
+  try { HS = JSON.parse(localStorage.getItem("tenkomori-highscore") || "{}") || {}; } catch (e) {}
+  const saveHS = () => { try { localStorage.setItem("tenkomori-highscore", JSON.stringify(HS)); } catch (e) {} };
+  const DIFF_NAME = { easy: "かんたん", normal: "ふつう", hard: "むずかしい" };
+  for (const k in HS) if (typeof HS[k] === "number") HS[k] = { easy: HS[k] };
+  const best = (gid, d) => (HS[gid] || {})[d];
+  function renderHS() {
+    document.querySelectorAll("[data-hs]").forEach((el) => {
+      el.innerHTML = '<span class="hscap">ハイ<br>スコア</span>' + ["easy", "normal", "hard"].map((d) => { const v = best(el.dataset.hs, d); return `<i><small>${DIFF_NAME[d]}</small><strong class="${v != null ? "" : "none"}">${v != null ? v : "ー"}</strong></i>`; }).join("");
+    });
+    if (game) document.querySelectorAll("#diffPick button").forEach((b) => {
+      const v = best(game.id, b.dataset.diff);
+      b.querySelector("em").textContent = v != null ? `ハイスコア ${v}` : "ハイスコア ー";
+      b.setAttribute("aria-checked", String(S.per[game.id].diff === b.dataset.diff));
+    });
+  }
+  const P = () => S.per[game.id];
+
+  const JUDGE = { easy: { p: .055, o: .1, a: .18 }, normal: { p: .042, o: .08, a: .14 }, hard: { p: .03, o: .06, a: .1 } };
+  const STRAY_PENALTY = 50; // からぶり1回で ひく点（1つぶんの 100点満点に対して）
+  const GRADE_TXT = { bacchiri: ["バッチリ！", "#2F9E44"], ok: ["OK", "#1C7ED6"], oshii: ["おしい", "#E8590C"], miss: ["ミス", "#868E96"] };
+  const FONT_DISP = "\"Mochiy Pop One\", sans-serif";
+
+  const $ = (id) => document.getElementById(id);
+  const cv = $("cv"), g = cv.getContext("2d"), stage = $("stage"), appEl = $("app");
+  const phaseEl = $("phase"), roundLbl = $("roundLbl"), comboEl = $("combo"), quitBtn = $("quitBtn");
+  const menuOv = $("menuOv"), titleOv = $("titleOv"), settingsOv = $("settingsOv"), resultOv = $("resultOv");
+  const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+  const lerp = (a, b, t) => a + (b - a) * t;
+  const easeBack = (x) => { const c = 2.2; return 1 + (c + 1) * Math.pow(x - 1, 3) + c * Math.pow(x - 1, 2); };
+  const easeOut = (x) => 1 - Math.pow(1 - clamp(x), 3);
+
+  // ---------- Audio ----------
+  let ac = null, master = null;
+  function ensureAudio() {
+    if (!ac) {
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      const b = ac.createBuffer(1, 1, 22050), s = ac.createBufferSource(); s.buffer = b; s.connect(ac.destination); s.start(0);
+    }
+    if (ac.state === "suspended") ac.resume();
+    const comp = ac.createDynamicsCompressor(); comp.connect(ac.destination);
+    master = ac.createGain(); master.gain.value = 0.9; master.connect(comp);
+  }
+  const outLat = () => (ac ? (ac.outputLatency || ac.baseLatency || 0) : 0);
+  let noiseBuf = null;
+  function getNoise() {
+    if (!noiseBuf) { noiseBuf = ac.createBuffer(1, ac.sampleRate * 0.5, ac.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
+    return noiseBuf;
+  }
+  function tone(t, f0, dur, { type = "sine", gain = .3, f1 = null, attack = .005 } = {}) {
+    const o = ac.createOscillator(), gn = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(f0, t);
+    if (f1) o.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    gn.gain.setValueAtTime(0.0001, t); gn.gain.exponentialRampToValueAtTime(gain, t + attack);
+    gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    o.connect(gn); gn.connect(master); o.start(t); o.stop(t + dur + .02);
+    return o;
+  }
+  function noise(t, dur, { gain = .2, type = "highpass", freq = 6000, q = 1, f1 = null } = {}) {
+    const s = ac.createBufferSource(), f = ac.createBiquadFilter(), gn = ac.createGain();
+    s.buffer = getNoise(); f.type = type; f.frequency.setValueAtTime(freq, t); f.Q.value = q;
+    if (f1) f.frequency.exponentialRampToValueAtTime(f1, t + dur);
+    gn.gain.setValueAtTime(gain, t); gn.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+    s.connect(f); f.connect(gn); gn.connect(master); s.start(t); s.stop(t + dur + .02);
+  }
+  const midi = (m) => 440 * Math.pow(2, (m - 69) / 12);
+  const SND = {
+    click: (t, acc) => tone(t, acc ? 1760 : 1175, .06, { type: "square", gain: .12 }),
+    kick: (t, v = 1) => tone(t, 130, .16, { f1: 42, gain: .55 * v }),
+    hat: (t) => noise(t, .035, { gain: .09 }),
+    bass: (t, m, d) => tone(t, midi(m), d, { type: "triangle", gain: .28, attack: .01 }),
+    stab: (t, ms) => ms.forEach((m) => tone(t, midi(m), .09, { type: "square", gain: .035 })),
+    miss: (t) => tone(t, 140, .22, { type: "square", f1: 90, gain: .1 }),
+    puff: (t) => noise(t, .05, { gain: .06, type: "lowpass", freq: 900 }),
+    fin: (t) => [60, 64, 67, 72, 76].forEach((m, i) => tone(t + i * .03, midi(m), 1.2, { type: "triangle", gain: .12, attack: .01 }))
+  };
+  // 共通BGM：beatTimes の各拍に ドン・チッ・ベース
+  const PROG = [[48, [60, 64, 67]], [45, [60, 64, 69]], [41, [60, 65, 69]], [43, [59, 62, 67]]];
+  function bgm(ev, t0, beat, nBeats, chordOf) {
+    const e = beat / 2;
+    for (let k = 0; k < nBeats; k++) {
+      const bt = t0 + k * beat, b = k % 4;
+      if (k < 4) { ev.push({ t: bt, fn: (t) => SND.click(t, b === 0) }); continue; }
+      const [root, chord] = PROG[chordOf(k) % 4];
+      ev.push({ t: bt, fn: (t) => SND.kick(t, b % 2 === 0 ? 1 : .6) });
+      ev.push({ t: bt + e, fn: (t) => { SND.hat(t); SND.stab(t, chord); } });
+      ev.push({ t: bt, fn: (t) => SND.bass(t, b === 3 ? root + 7 : root, beat * .7) });
+    }
+  }
+
+  // 1曲まるごと：メロディ・ドラム・ベース（Aメロ → Bメロ → サビ）
+function songBgm(ev, t0, beat, nBars, style) {
+    const e = beat / 2;
+    for (let k = 0; k < 4; k++) ev.push({ t: t0 + k * beat, fn: (t) => SND.click(t, k === 0) });
+    const KAERU = style === "kaeru";
+    const ROOT = KAERU ? [48, 45, 41, 43] : [45, 41, 43, 40];
+    const CH = KAERU ? [[60, 64, 67], [57, 60, 64], [53, 57, 60], [55, 59, 62]] : [[57, 60, 64], [53, 57, 60], [55, 59, 62], [52, 55, 59]];
+    const MEL = KAERU ? {
+      A: [72, 0, 76, 0, 79, 0, 76, 0, 77, 0, 76, 74, 72, 0, 0, 0],
+      B: [79, 81, 79, 76, 77, 0, 74, 0, 76, 77, 79, 0, 84, 0, 79, 0],
+      C: [84, 0, 83, 84, 86, 0, 84, 81, 79, 81, 84, 0, 88, 86, 84, 0]
+    } : {
+      A: [69, 0, 72, 74, 76, 0, 74, 72, 69, 0, 67, 69, 0, 0, 64, 0],
+      B: [76, 76, 74, 72, 74, 0, 72, 69, 72, 74, 76, 79, 76, 0, 74, 0],
+      C: [81, 0, 79, 81, 84, 0, 81, 79, 76, 79, 81, 0, 84, 83, 81, 0]
+    };
+    for (let b = 0; b < nBars; b++) {
+      const bs = t0 + (1 + b) * 4 * beat, sec = b < nBars * .4 ? "A" : b < nBars * .8 ? "B" : "C";
+      const ci = b % 4, root = ROOT[ci];
+      if (b === 0 || b === Math.ceil(nBars * .4) || b === Math.ceil(nBars * .8)) ev.push({ t: bs, fn: (t) => noise(t, 1.1, { gain: .16, type: "highpass", freq: 5000 }) });
+      for (let i = 0; i < 8; i++) {
+        const t = bs + i * e;
+        if (i === 0 || i === 4 || (sec !== "A" && i === 3)) ev.push({ t, fn: (tt) => SND.kick(tt, i === 3 ? .6 : 1) });
+        if (i === 2 || i === 6) ev.push({ t, fn: (tt) => { noise(tt, .12, { gain: .3, type: "bandpass", freq: 1800, q: .7 }); tone(tt, 200, .08, { type: "triangle", gain: .15 }); } });
+        ev.push({ t, fn: (tt) => noise(tt, sec === "C" && i % 2 ? .12 : .03, { gain: .07 }) });
+        ev.push({ t, fn: (tt) => tone(tt, midi(i % 2 ? root + 12 : root), e * .8, { type: "triangle", gain: .26, attack: .01 }) });
+        if (i % 4 === 2) ev.push({ t, fn: (tt) => CH[ci].forEach((m) => tone(tt, midi(m), e * .9, { type: "square", gain: .025 })) });
+        const m = MEL[sec][(b % 2) * 8 + i];
+        if (m) ev.push({ t, fn: (tt) => { tone(tt, midi(m), e * .85, { type: "square", gain: .04, attack: .01 }); tone(tt, midi(m), e * .9, { type: "triangle", gain: .06, attack: .01 }); } });
+      }
+    }
+  }
+
+  // ---------- Engine state ----------
+  let game = null, playing = false, chart = null, sched = [], si = 0, schedTimer = null;
+  let floaters = [], combo = 0, holds = new Map(), lastPhase = "", celebrateAt = -99, strays = 0;
+  const CONF = Array.from({ length: 60 }, (_, i) => ({ x: Math.random(), v: .5 + Math.random() * .8, r: Math.random() * 6, c: ["#E0463C", "#FFC94A", "#1C7ED6", "#2F9E44", "#FF9EB8"][i % 5], w: Math.random() * 6 }));
+
+  function applyTheme() {
+    const c = game ? game.colors : { bg: "#FFE9C9", btn: "#FFC94A", btnDk: "#D39A12", floor: "#6B3F1F" };
+    const r = document.documentElement.style;
+    r.setProperty("--bg", c.bg); r.setProperty("--btn", c.btn); r.setProperty("--btn-dk", c.btnDk); r.setProperty("--floor", c.floor);
+    $("padLbl").textContent = game ? game.pad[0] : "おす！";
+    $("padSub").textContent = game ? game.pad[1] : "";
+    roundLbl.textContent = game ? game.name : "";
+    setPhase(game ? "よーい" : "えらんでね", false);
+  }
+  function openMenu() {
+    stopPlay(); game = null; chart = null; applyTheme();
+    titleOv.hidden = resultOv.hidden = settingsOv.hidden = true; menuOv.hidden = false;
+  }
+  function openGame(id) {
+    stopPlay(); game = GAMES[id]; chart = null; game.reset?.(); applyTheme();
+    $("gTitle").innerHTML = game.titleHTML; $("gHow").innerHTML = game.howHTML; renderHS();
+    menuOv.hidden = resultOv.hidden = settingsOv.hidden = true; titleOv.hidden = false;
+  }
+  function startGame() {
+    ensureAudio();
+    game.reset?.();
+    chart = game.build(ac.currentTime + 0.7);
+    chart.notes.sort((a, b) => a.t - b.t);
+    chart.ev.sort((a, b) => a.t - b.t);
+    sched = chart.ev; si = 0;
+    floaters = []; combo = 0; holds.clear(); lastPhase = ""; celebrateAt = -99; strays = 0;
+    playing = true;
+    menuOv.hidden = titleOv.hidden = resultOv.hidden = settingsOv.hidden = true;
+    quitBtn.hidden = false; comboEl.textContent = "";
+    clearInterval(schedTimer); schedTimer = setInterval(pump, 25); pump();
+  }
+  function pump() {
+    if (!playing) return;
+    const lim = ac.currentTime + 0.2;
+    while (si < sched.length && sched[si].t < lim) { sched[si].fn(Math.max(sched[si].t, ac.currentTime)); si++; }
+  }
+  function stopPlay() {
+    if (playing && master) master.gain.setValueAtTime(0.0001, ac.currentTime);
+    playing = false; clearInterval(schedTimer);
+    holds.forEach((n) => stopHoldSound(n)); holds.clear();
+    quitBtn.hidden = true; comboEl.textContent = "";
+  }
+  function quit() { stopPlay(); chart = null; game.reset?.(); applyTheme(); titleOv.hidden = false; }
+  function finish() {
+    const all = chart.notes, cnt = { bacchiri: 0, ok: 0, oshii: 0, miss: 0 };
+    all.forEach((n) => cnt[n.grade || "miss"]++);
+    // バッチリでも ずれた ぶんだけ 少し へる → ぜんぶ ど真ん中で やっと 100点
+    const pts = { ok: 55, oshii: 20, miss: 0 };
+    const J = JUDGE[S.judge];
+    const pt = (n) => n.grade === "bacchiri" ? 100 - 12 * clamp((n.dev || 0) / J.p) : pts[n.grade || "miss"];
+    const raw = all.reduce((s, n) => s + pt(n), 0) - strays * STRAY_PENALTY;
+    let score = Math.max(0, Math.floor(raw / Math.max(1, all.length)));
+    if (score >= 100 && !(strays === 0 && all.every((n) => n.grade === "bacchiri"))) score = 99;
+    $("tStray").textContent = strays;
+    playing = false; clearInterval(schedTimer); quitBtn.hidden = true;
+    $("resScore").innerHTML = score + "<small>てん</small>";
+    $("resRank").textContent = score >= 100 ? "パーフェクト！！" : score >= 90 ? game.ranks[0] : score >= 75 ? "すごい！ いいリズム！" : score >= 55 ? "いいかんじ！" : "もういっかい やってみよう！";
+    const dk = P().diff, prev = best(game.id, dk), isNew = prev == null || score > prev;
+    if (isNew) { HS[game.id] = { ...(HS[game.id] || {}), [dk]: score }; saveHS(); renderHS(); }
+    $("resNew").hidden = !isNew || score === 0;
+    if (isNew && score > 0) {
+      $("resNewSub").textContent = prev == null ? `はじめての きろく ${score}てん！` : `まえの きろく ${prev}てん → ${score}てん！`;
+      celebrateAt = vnow();
+    }
+    $("resBest").textContent = `${DIFF_NAME[dk]}の ハイスコア ${best(game.id, dk)}てん`;
+    if (isNew && score > 0) [0, .12, .24, .36, .6].forEach((d, i) => tone(ac.currentTime + .9 + d, midi([72, 76, 79, 84, 88][i]), i === 4 ? .8 : .2, { type: "triangle", gain: .14 }));
+    $("tBacchiri").textContent = cnt.bacchiri; $("tOk").textContent = cnt.ok; $("tOshii").textContent = cnt.oshii; $("tMiss").textContent = cnt.miss;
+    setPhase("おしまい！", true);
+    resultOv.hidden = false;
+  }
+
+  // ---------- Input / judge ----------
+  const inTime = () => ac.currentTime - outLat() - S.offset / 1000;
+  const vnow = () => (ac ? ac.currentTime - outLat() : performance.now() / 1000);
+  function press(id) {
+    if (!playing) return;
+    const t = inTime(), J = JUDGE[S.judge];
+    let best = null, bd = 1e9;
+    for (const n of chart.notes) {
+      if (n.state) continue;
+      const d = Math.abs(t - n.t);
+      if (d <= J.a && d < bd) { bd = d; best = n; }
+    }
+    if (!best) {
+      game.onFree ? game.onFree(vnow()) : SND.puff(ac.currentTime);
+      strays++; combo = 0; comboEl.textContent = "";
+      floaters.push({ n: null, text: "からぶり", color: "#868E96", t0: vnow() });
+      return;
+    }
+    const grade = bd <= J.p ? "bacchiri" : bd <= J.o ? "ok" : "oshii";
+    best.dev = bd;
+    if (best.hold) {
+      best.state = "holding"; best.grade = grade;
+      best.snd = tone(ac.currentTime, 160, Math.max(.1, best.endT - t), { type: "sawtooth", f1: 480, gain: .06, attack: .02 });
+      holds.set(id, best);
+    } else hit(best, grade);
+  }
+  function release(id) {
+    const n = holds.get(id); if (!n) return;
+    holds.delete(id);
+    if (n.state !== "holding") return;
+    if (inTime() >= n.endT - JUDGE[S.judge].a * .8) hit(n, n.grade);
+    else { stopHoldSound(n); miss(n, "はなしちゃった"); }
+  }
+  function stopHoldSound(n) { try { n.snd && n.snd.stop(); } catch (e) {} n.snd = null; }
+  function hit(n, grade) {
+    stopHoldSound(n);
+    n.state = "hit"; n.grade = grade; n.at = vnow();
+    game.onHit(n, grade, ac.currentTime);
+    combo++; comboEl.textContent = combo >= 3 ? `れんぞく\n${combo}` : "";
+    floaters.push({ n, text: game.hitText?.(n, grade) || GRADE_TXT[grade][0], color: GRADE_TXT[grade][1], t0: n.at });
+  }
+  function miss(n, label) {
+    n.state = "missed"; n.grade = "miss"; n.at = vnow();
+    SND.miss(ac.currentTime); game.onMiss?.(n, ac.currentTime);
+    combo = 0; comboEl.textContent = "";
+    floaters.push({ n, text: label || "ミス", color: GRADE_TXT.miss[1], t0: n.at });
+  }
+
+  const pad = $("pad"), padIds = new Set();
+  pad.addEventListener("pointerdown", (ev) => { ev.preventDefault(); pad.setPointerCapture?.(ev.pointerId); padIds.add(ev.pointerId); pad.classList.add("down"); press("p" + ev.pointerId); });
+  const up = (ev) => { if (!padIds.has(ev.pointerId)) return; padIds.delete(ev.pointerId); if (!padIds.size) pad.classList.remove("down"); release("p" + ev.pointerId); };
+  pad.addEventListener("pointerup", up); pad.addEventListener("pointercancel", up); pad.addEventListener("lostpointercapture", up);
+  pad.addEventListener("contextmenu", (ev) => ev.preventDefault());
+  const KEYS = new Set(["Space", "Enter", "KeyF", "KeyJ"]);
+  addEventListener("keydown", (ev) => { if (!KEYS.has(ev.code) || !playing) return; ev.preventDefault(); if (ev.repeat) return; pad.classList.add("down"); press("k" + ev.code); });
+  addEventListener("keyup", (ev) => { if (!KEYS.has(ev.code)) return; pad.classList.remove("down"); release("k" + ev.code); });
+
+  function setPhase(text, go) {
+    if (text === lastPhase) return;
+    lastPhase = text; phaseEl.textContent = text; phaseEl.classList.toggle("go", !!go);
+    phaseEl.classList.add("bump"); setTimeout(() => phaseEl.classList.remove("bump"), 90);
+  }
+  function countIn(now) { // 最初の1小節
+    if (now < chart.t0) { setPhase("よーい", false); return true; }
+    if (now < chart.t0 + chart.bar) { setPhase(["1", "2", "3", "4"][clamp(Math.floor((now - chart.t0) / chart.beat), 0, 3)], false); return true; }
+    if (now >= chart.endT) { setPhase("おしまい！", true); return true; }
+    return false;
+  }
+  // 前半は かんたんなリズム → 後半ほど むずかしく（たまに ひとつ下のレベルで ひと息）
+  function pickLevel(i, R, lo, hi) {
+    const maxL = Math.min(hi, lo + Math.floor((hi - lo + 1) * i / Math.max(1, R)));
+    const lvl = (maxL > lo && i > 0 && Math.random() < .2) ? maxL - 1 : maxL;
+    return { maxL, lvl };
+  }
+  const pick = (arr, not) => { let v; do { v = arr[Math.floor(Math.random() * arr.length)]; } while (v === not && arr.length > 1); return v; };
+  function bigText(label, x, y, size, color, sc = 1) {
+    g.save(); g.translate(x, y); g.scale(sc, sc);
+    g.font = `${size}px ${FONT_DISP}`; g.textAlign = "center"; g.textBaseline = "middle";
+    g.lineWidth = Math.max(5, size * .28); g.lineJoin = "round"; g.strokeStyle = "#FFF8EE"; g.strokeText(label, 0, 0);
+    g.fillStyle = color; g.fillText(label, 0, 0);
+    g.restore();
+  }
+
+  // ---------- Canvas ----------
+  let cw = 0, ch = 0, dpr = 1;
+  function resize() {
+    dpr = Math.min(3, window.devicePixelRatio || 1);
+    cw = stage.clientWidth; ch = stage.clientHeight;
+    cv.width = Math.round(cw * dpr); cv.height = Math.round(ch * dpr);
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  addEventListener("resize", resize);
+
+  function drawMenuBg(now) {
+    g.fillStyle = "#FFE9C9"; g.fillRect(0, 0, cw, ch);
+    g.fillStyle = "rgba(211,154,18,.22)"; g.font = `28px ${FONT_DISP}`; g.textAlign = "center";
+    for (let i = 0; i < 14; i++) {
+      const x = ((i * 97) % cw), y = ((i * 131 + now * 18) % (ch + 40)) - 20;
+      g.fillText(i % 2 ? "♪" : "♫", x, y);
+    }
+  }
+
+  function frame() {
+    requestAnimationFrame(frame);
+    if (!cw) return;
+    const now = vnow();
+    g.clearRect(0, 0, cw, ch);
+    if (!game) { drawMenuBg(now); return; }
+    if (playing && chart) {
+      const J = JUDGE[S.judge], ti = inTime();
+      for (const n of chart.notes) {
+        if (!n.state && ti > n.t + J.a) miss(n);
+        if (n.state === "holding" && ti >= n.endT) { for (const [k, v] of holds) if (v === n) holds.delete(k); hit(n, n.grade); }
+      }
+      if (!countIn(now)) game.phase(now);
+      if (now > chart.endT + 1.0) finish();
+    }
+    game.draw(now);
+    // ハイスコアの かみふぶき
+    const ct = now - celebrateAt;
+    if (ct >= 0 && ct < 4) {
+      for (const c of CONF) {
+        const y = (ct * c.v * ch * .45) - 20, x = c.x * cw + Math.sin(ct * 3 + c.w) * 16;
+        if (y > ch + 20) continue;
+        g.save(); g.translate(x, y); g.rotate(ct * 5 + c.r); g.fillStyle = c.c; g.globalAlpha = clamp(4 - ct);
+        g.fillRect(-5, -3, 10, 6); g.restore();
+      }
+    }
+    // 判定テキスト
+    floaters = floaters.filter((f) => now - f.t0 < .8);
+    for (const f of floaters) {
+      const t = now - f.t0, p = game.floatXY(f.n);
+      g.globalAlpha = clamp(1.6 - t * 2);
+      bigText(f.text, clamp(p.x, 48, cw - 48), Math.max(20, p.y - t * 36), Math.max(15, Math.min(24, cw * .055)), f.color);
+      g.globalAlpha = 1;
+    }
+  }
+
+  // =====================================================================
+  //  ゲーム1：けぬき名人
+  // =====================================================================
+  const Keneki = (() => {
+    const DIFF = { easy: [1, 2], normal: [1, 3], hard: [2, 4] };
+    const PATTERNS = {
+      1: ["x.x.x.x.", "x...x...", "x.x.x...", "x...x.x.", "..x.x.x.", "x.x...x."],
+      2: ["xxx.x...", "x.xxx...", "x.x.xxx.", "x..xx...", "x.x.H-..", "H-..x.x."],
+      3: ["xxx.x.x.", "x.xxx.x.", "xxxxx...", "x..x..x.", ".xx.x.x.", "H--.x.x.", "x.H--.x."],
+      4: ["xxxxxxx.", "xx.xx.x.", "x.xx.xx.", ".x.xx.x.", "xxH-.xx.", "x.xxH--."]
+    };
+    const parse = (str) => {
+      const out = [];
+      for (let i = 0; i < 8; i++) {
+        if (str[i] === "x") out.push({ pos: i, len: 0 });
+        else if (str[i] === "H") { let j = i + 1; while (str[j] === "-") j++; out.push({ pos: i, len: j - i }); }
+      }
+      return out;
+    };
+    let lastPluckAt = -9, lastMissAt = -9;
+    const snd = {
+      sprout: (t) => { tone(t, 420, .12, { f1: 1100, gain: .3 }); tone(t + .01, 840, .06, { type: "triangle", gain: .08 }); },
+      sproutCurl: (t, d) => { const o = tone(t, 300, Math.max(.2, d), { type: "triangle", f1: 700, gain: .25, attack: .02 }); const l = ac.createOscillator(), lg = ac.createGain(); l.frequency.value = 14; lg.gain.value = 40; l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(t + Math.max(.2, d)); },
+      pluck: (t, grade) => {
+        noise(t, .025, { gain: .5, type: "highpass", freq: 3500 });
+        tone(t, 1900, .05, { f1: 2600, type: "square", gain: .09 });
+        tone(t + .015, 700, .08, { f1: 1200, gain: .2 });
+        tone(t + .04, 620, .12, { type: "triangle", f1: 480, gain: .06 });
+        if (grade === "bacchiri") { tone(t + .06, midi(96), .1, { gain: .1 }); tone(t + .11, midi(101), .14, { gain: .08 }); }
+      },
+      cue: (t, hi) => { tone(t, hi ? 1320 : 990, .08, { type: "triangle", gain: .3 }); noise(t, .03, { gain: .15, type: "bandpass", freq: hi ? 2500 : 1800, q: 4 }); }
+    };
+
+    function build(t0) {
+      const p = S.per.keneki, beat = 60 / p.bpm, bar = beat * 4, e = beat / 2;
+      const [lo, hi] = DIFF[p.diff], R = p.rounds;
+      const gapBeats = S.gap || 0, gap = gapBeats * beat, roundLen = bar * 2 + gap;
+      const rounds = []; let last = "";
+      for (let i = 0; i < R; i++) {
+        const { maxL, lvl } = pickLevel(i, R, lo, hi);
+        let pat = pick(PATTERNS[lvl], last);
+        if (i === 0) pat = "x.x.x.x.";
+        else if (i === 1 && lvl === 1) pat = pick(["x...x...", "x.x.x..."], last);
+        if (i === Math.floor(R * .6) && !rounds.some((r) => r.notes.some((n) => n.len))) {
+          const hs = PATTERNS[Math.min(4, Math.max(2, maxL))].filter((q) => q.includes("H")); pat = pick(hs);
+        }
+        last = pat;
+        const callStart = t0 + bar + i * roundLen, respStart = callStart + bar + gap;
+        const notes = parse(pat).map((n) => ({
+          ...n, callT: callStart + n.pos * e, t: respStart + n.pos * e, endT: respStart + (n.pos + n.len) * e,
+          hold: n.len > 0, state: null, grade: null, at: 0, bend: (Math.random() - .5) * .8, spin: Math.random() < .5 ? -1 : 1
+        }));
+        rounds.push({ callStart, gapStart: callStart + bar, respStart, notes });
+      }
+      const endT = t0 + bar + R * roundLen, ev = [];
+      const bpr = 8 + gapBeats;
+      bgm(ev, t0, beat, 4 + R * bpr, (k) => { const rk = (k - 4) % bpr, ri = Math.floor((k - 4) / bpr); return ri * 2 + (rk >= 4 + gapBeats ? 1 : 0); });
+      for (let r = 0; r < R; r++) for (let k = gapBeats - 2; k < gapBeats; k++) if (k >= 0) {
+        const t = rounds[r].gapStart + k * beat; ev.push({ t, fn: (tt) => snd.cue(tt, k === gapBeats - 1) });
+      }
+      rounds.forEach((r) => r.notes.forEach((n) => ev.push({ t: n.callT, fn: (t) => n.len ? snd.sproutCurl(t, n.len * e) : snd.sprout(t) })));
+      ev.push({ t: endT, fn: (t) => { SND.kick(t); SND.fin(t); } });
+      return { t0, beat, bar, e, rounds, notes: rounds.flatMap((r) => r.notes), endT, ev, roundLen, gapBeats };
+    }
+    function curRound(now) {
+      let ri = -1; for (let i = 0; i < chart.rounds.length; i++) if (now >= chart.rounds[i].callStart - .02) ri = i;
+      return ri;
+    }
+    function phase(now) {
+      const ri = curRound(now), r = chart.rounds[Math.max(0, ri)];
+      roundLbl.textContent = `ラウンド\n${Math.max(0, ri) + 1} / ${chart.rounds.length}`;
+      if (now < r.gapStart) setPhase("きいて♪", false);
+      else if (now < r.respStart) {
+        const left = Math.ceil((r.respStart - now) / chart.beat - 1e-6);
+        setPhase(left > 2 ? "じゅんび…" : left === 2 ? "せー" : "の！", left <= 2);
+      } else setPhase("ぬいて！", true);
+    }
+
+    let G = null;
+    function geo(bob) {
+      const R = Math.min(cw * .4, ch * .42);
+      const cx = cw / 2, cy = ch - R * .72 + bob;
+      const A0 = -Math.PI * .82, A1 = -Math.PI * .18;
+      const ang = (pos) => A0 + (A1 - A0) * (pos + .5) / 8;
+      const pore = (pos) => { const a = ang(pos); return { x: cx + Math.cos(a) * R, y: cy + Math.sin(a) * R, a }; };
+      return { R, cx, cy, ang, pore, hl: R * .3, lw: Math.max(3, R * .03) };
+    }
+    function drawTiles() {
+      g.fillStyle = "#BFE9DF"; g.fillRect(0, 0, cw, ch);
+      const ts = Math.max(34, cw / 9);
+      g.strokeStyle = "#E6F7F2"; g.lineWidth = 3; g.beginPath();
+      for (let x = ts / 2; x < cw; x += ts) { g.moveTo(x, 0); g.lineTo(x, ch); }
+      for (let y = ts / 2; y < ch; y += ts) { g.moveTo(0, y); g.lineTo(cw, y); }
+      g.stroke();
+    }
+    function drawHead(now, mood) {
+      const { R, cx, cy } = G;
+      g.fillStyle = "#FFC49E"; g.strokeStyle = "#3A2413"; g.lineWidth = G.lw;
+      [-1, 1].forEach((s) => { g.beginPath(); g.ellipse(cx + s * R * .98, cy + R * .1, R * .13, R * .19, 0, 0, 7); g.fill(); g.stroke(); });
+      const gr = g.createRadialGradient(cx - R * .3, cy - R * .55, R * .05, cx, cy, R);
+      gr.addColorStop(0, "#FFE6D3"); gr.addColorStop(1, "#FFCBA6");
+      g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill(); g.stroke();
+      g.fillStyle = "rgba(255,255,255,.75)"; g.beginPath(); g.ellipse(cx - R * .35, cy - R * .68, R * .16, R * .07, -.5, 0, 7); g.fill();
+      g.fillStyle = "rgba(160,90,60,.35)";
+      for (let p = 0; p < 8; p++) { const o = G.pore(p); g.beginPath(); g.arc(o.x - Math.cos(o.a) * 3, o.y - Math.sin(o.a) * 3, Math.max(2, R * .018), 0, 7); g.fill(); }
+      const ey = cy - R * .02, ex = R * .3;
+      g.strokeStyle = "#3A2413"; g.fillStyle = "#3A2413"; g.lineWidth = G.lw * 1.1; g.lineCap = "round";
+      const blink = (now % 3.3) < .12;
+      if (mood === "ouch" || mood === "strain") [-1, 1].forEach((s) => { g.beginPath(); g.moveTo(cx + s * ex - R * .07, ey - R * .05); g.lineTo(cx + s * ex + s * R * .02, ey); g.lineTo(cx + s * ex - R * .07, ey + R * .05); g.stroke(); });
+      else if (mood === "smug") [-1, 1].forEach((s) => { g.beginPath(); g.arc(cx + s * ex, ey + R * .03, R * .07, Math.PI * 1.15, Math.PI * 1.85); g.stroke(); });
+      else if (blink) [-1, 1].forEach((s) => { g.beginPath(); g.moveTo(cx + s * ex - R * .06, ey); g.lineTo(cx + s * ex + R * .06, ey); g.stroke(); });
+      else [-1, 1].forEach((s) => { g.beginPath(); g.arc(cx + s * ex, ey, R * .055, 0, 7); g.fill(); });
+      g.fillStyle = mood === "ouch" ? "rgba(255,110,110,.75)" : "rgba(255,150,150,.5)";
+      [-1, 1].forEach((s) => { g.beginPath(); g.ellipse(cx + s * R * .5, cy + R * .18, R * .11, R * .07, 0, 0, 7); g.fill(); });
+      g.fillStyle = "#FFB48A"; g.lineWidth = G.lw;
+      g.beginPath(); g.ellipse(cx, cy + R * .14, R * .1, R * .08, 0, 0, 7); g.fill(); g.stroke();
+      g.lineWidth = G.lw * 1.1; g.fillStyle = "#8C2F2F";
+      const my = cy + R * .34;
+      if (mood === "ouch") { g.beginPath(); g.ellipse(cx, my, R * .07, R * .09, 0, 0, 7); g.fill(); g.stroke(); }
+      else if (mood === "strain") { g.beginPath(); for (let i = 0; i <= 6; i++) { const x = cx - R * .14 + i * R * .047, y = my + (i % 2 ? -1 : 1) * R * .025; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
+      else if (mood === "smug") { g.beginPath(); g.moveTo(cx - R * .12, my); g.quadraticCurveTo(cx + R * .02, my + R * .08, cx + R * .15, my - R * .04); g.stroke(); }
+      else { g.beginPath(); g.arc(cx, my - R * .06, R * .12, Math.PI * .2, Math.PI * .8); g.stroke(); }
+    }
+    function drawHair(o, n, grow, opts = {}) {
+      const len = G.hl * grow * (opts.stretch || 1); if (len < 1) return;
+      const a = o.a, dx = Math.cos(a), dy = Math.sin(a), nx = -dy, ny = dx, b = (n.bend || 0) * len * .35;
+      const tipx = o.x + dx * len + nx * b * .6, tipy = o.y + dy * len + ny * b * .6;
+      g.strokeStyle = opts.missed ? "#6B5A50" : "#2A1A12"; g.lineCap = "round"; g.lineJoin = "round";
+      g.lineWidth = G.lw * (n.len ? 1.25 : 1);
+      g.beginPath(); g.moveTo(o.x, o.y); g.quadraticCurveTo(o.x + dx * len * .5 + nx * b, o.y + dy * len * .5 + ny * b, tipx, tipy); g.stroke();
+      if (n.len) {
+        const r = G.hl * .16 * grow, base = Math.atan2(dy, dx) + Math.PI;
+        g.beginPath();
+        for (let i = 0; i <= 40; i++) {
+          const t = i / 40, ang = t * Math.PI * 3.2 * n.spin, rr = r * (1 - t * .75);
+          const px = tipx + dx * r + Math.cos(ang + base) * rr, py = tipy + dy * r + Math.sin(ang + base) * rr;
+          i ? g.lineTo(px, py) : g.moveTo(tipx, tipy);
+        }
+        g.stroke();
+      }
+    }
+    function drawTweezers(x, y, ang, size, pinch) {
+      g.save(); g.translate(x, y); g.rotate(ang + Math.PI / 2);
+      const L = size, w = size * .16 * (1 - pinch * .85);
+      g.lineCap = "round"; g.lineJoin = "round";
+      [-1, 1].forEach((s) => {
+        g.beginPath(); g.moveTo(s * w * .15, 0); g.lineTo(s * w, -L * .55); g.lineTo(s * size * .12, -L);
+        g.strokeStyle = "#3A2413"; g.lineWidth = size * .12; g.stroke();
+        g.strokeStyle = "#C9D3DB"; g.lineWidth = size * .07; g.stroke();
+      });
+      g.restore();
+    }
+
+    function draw(now) {
+      drawTiles();
+      let bob = Math.sin(now * 2) * 2;
+      if (chart && playing && now > chart.t0) bob = -Math.abs(Math.sin(Math.PI * ((now - chart.t0) / chart.beat))) * 4;
+      G = geo(bob);
+      if (!chart) {
+        drawHead(now, "normal");
+        [1, 3, 4, 6].forEach((p, i) => drawHair(G.pore(p), { len: i === 2 ? 2 : 0, bend: [.3, -.2, 0, .25][i], spin: 1 }, 1));
+        return;
+      }
+      const { e } = chart, ri = curRound(now), cur = ri >= 0 ? chart.rounds[ri] : null;
+      const holding = cur && cur.notes.some((n) => n.state === "holding");
+      const mood = holding ? "strain" : (now - lastPluckAt < .22) ? "ouch" : (now - lastMissAt < .6) ? "smug" : "normal";
+      drawHead(now, mood);
+      const flying = [];
+      if (cur) {
+        for (const n of cur.notes) {
+          if (now < n.callT) continue;
+          if (n.state === "hit") { flying.push(n); continue; }
+          const o = G.pore(n.pos), grow = clamp(easeBack(clamp((now - n.callT) / .12)), 0, 1.25);
+          let stretch = 1, ox = 0, oy = 0;
+          if (n.state === "holding") {
+            const pr = clamp((inTime() - n.t) / Math.max(.05, n.endT - n.t));
+            stretch = 1 + pr * .6; ox = Math.sin(now * 70) * 1.5; oy = Math.cos(now * 70) * 1.5;
+            g.fillStyle = "#FFCBA6";
+            g.beginPath(); g.ellipse(o.x + Math.cos(o.a) * pr * G.hl * .06, o.y + Math.sin(o.a) * pr * G.hl * .06, G.R * .05, G.R * .03 + pr * G.R * .03, o.a + Math.PI / 2, 0, 7); g.fill();
+          }
+          drawHair({ ...o, x: o.x + ox, y: o.y + oy }, n, grow, { stretch, missed: n.state === "missed" });
+        }
+        for (const n of cur.notes) {
+          if (!n.len || now < n.callT || n.state === "hit" || n.state === "holding") continue;
+          const o = G.pore(n.pos), rr = G.R + G.hl * 1.35;
+          bigText("ながおし", clamp(G.cx + Math.cos(o.a) * rr, 40, cw - 40), G.cy + Math.sin(o.a) * rr, Math.max(12, G.R * .085), "#D9607F");
+        }
+      }
+      if (ri > 0) for (const n of chart.rounds[ri - 1].notes) if (n.state === "hit") flying.push(n);
+      for (const n of flying) {
+        const t = now - n.at; if (t > 1) continue;
+        const o = G.pore(n.pos), d = G.hl * (.4 + t * 3.2), dx = Math.cos(o.a), dy = Math.sin(o.a);
+        const x = o.x + dx * d + Math.cos(o.a + Math.PI / 2) * n.spin * t * 30, y = o.y + dy * d + 260 * t * t;
+        g.save(); g.globalAlpha = clamp(1.3 - t * 1.3); g.translate(x, y); g.rotate(n.spin * t * 9);
+        drawHair({ x: 0, y: 0, a: o.a }, n, 1);
+        if (t < .25 && !S.guide) drawTweezers(dx * G.hl * .9, dy * G.hl * .9, o.a + Math.PI, G.R * .32, 1);
+        g.restore();
+        if (t < .5) { g.fillStyle = `rgba(255,90,90,${.7 * (1 - t / .5)})`; g.beginPath(); g.arc(o.x, o.y, G.R * .035, 0, 7); g.fill(); }
+        if (t < .3) { g.globalAlpha = 1 - t / .3; bigText("プチッ", o.x + dx * G.hl * .6, o.y + dy * G.hl * .6 - t * 20, Math.max(12, G.R * .09), "#3A2413"); g.globalAlpha = 1; }
+      }
+      // せーの
+      if (cur && chart.gapBeats && now >= cur.gapStart && now < cur.respStart) {
+        const gb = (now - cur.gapStart) / chart.beat, gbN = chart.gapBeats, bf = gb % 1;
+        if (gb >= gbN - 2) bigText(gb < gbN - 1 ? "せー" : "の！", G.cx, Math.max(40, G.cy - G.R - G.hl * 2.1), Math.max(26, G.R * .22), "#D9607F", 1 + .45 * (1 - clamp(bf * 4)));
+      }
+      // けぬき：おなじ速さで 左から右へ。せーのの前から 画面の外を流れてきて、そのまま最後まで
+      if (S.guide) {
+        const drawGuide = (r) => {
+          if (now < r.gapStart - (chart.gapBeats ? 0 : chart.beat)) return;
+          let pos = (now - r.respStart) / e, pulling = 0, stay = false;   // 毛の時間に pos = その毛の位置
+          const size = G.R * .3;
+          // まきげ：ぬけるまで その毛の上で とまって ひっぱる → ぬけたら すばやく 元のペースに もどる
+          for (const n of r.notes) if (n.hold) {
+            if (now >= n.t && now < n.endT) { pos = n.pos; stay = true; pulling = clamp((now - n.t) / (n.endT - n.t)); }
+            else if (now >= n.endT && now < n.endT + e) pos = lerp(n.pos, pos, easeOut((now - n.endT) / e));
+          }
+          if (pos < -9 || pos > 10.5) return; // 円をひとまわりして また出てこないように
+          const bfr = (((now - r.respStart) / chart.beat) % 1 + 1) % 1;
+          const holdingNow = stay && r.notes.some((n) => n.state === "holding");
+          const rr = G.R + G.hl * 1.02 * (holdingNow ? 1 + pulling * .6 : 1) + (stay ? 0 : Math.abs(Math.sin(Math.PI * bfr)) * G.hl * .3);
+          const pt = (q) => { const a = G.ang(q); return { x: G.cx + Math.cos(a) * rr, y: G.cy + Math.sin(a) * rr, a }; };
+          // 頭のカーブを そのまま のばした道を、おなじ速さで すすむ（左下から回りこんで来て、右下へ去る）
+          const P = pt(pos), sh = holdingNow ? Math.sin(now * 70) * 1.5 : 0;
+          const x = Math.min(Math.max(P.x, size * .7), cw - size * .7) + sh, y = P.y, ang = P.a + Math.PI;
+          if (y > ch + size) return;
+          g.globalAlpha = clamp((now - r.gapStart) / chart.beat + .2) * clamp((ch - y) / (size * 2));
+          drawTweezers(x, y, ang, size, (holdingNow || (padIds.size && now >= r.respStart && pos <= 8)) ? 1 : 0);
+          if (holdingNow) bigText("ぐぐぐ…", x, y - size * 1.4, Math.max(13, G.R * .09), "#D9607F");
+          g.globalAlpha = 1;
+        };
+        // 1本だけ：まだ前のラウンドのが 去っていく途中なら そっちを、あとは 今のラウンド
+        const prevR = ri > 0 ? chart.rounds[ri - 1] : null;
+        if (cur && now >= cur.gapStart - (chart.gapBeats ? 0 : chart.beat)) drawGuide(cur);
+        else if (prevR) drawGuide(prevR);
+      }
+    }
+    return {
+      id: "keneki", name: "けぬき名人",
+      colors: { bg: "#BFE9DF", btn: "#FF9EB8", btnDk: "#D9607F", floor: "#2F7F72" },
+      pad: ["プチッ！", "ここを おして ぬく"],
+      titleHTML: '<span class="pop">プチッと！</span><br>けぬき名人',
+      howHTML: `<li><svg class="ic" viewBox="0 0 30 30"><circle cx="15" cy="15" r="13" fill="#BFE9DF" stroke="#3A2413" stroke-width="2.5"/><path d="M11 10v10M15 8v14M19 11v8" stroke="#3A2413" stroke-width="2.5" stroke-linecap="round"/></svg><span>ツルピカさんの あたまに、けが ピョン・ピョン と リズムで はえてくるよ。よーく きいてね。</span></li>
+        <li><svg class="ic" viewBox="0 0 30 30"><path d="M4 26a11 11 0 0 1 22 0z" fill="#FFD3B4" stroke="#3A2413" stroke-width="2.5"/><path d="M15 15c1-4-1-7 1-11" fill="none" stroke="#2A1A12" stroke-width="2.5" stroke-linecap="round"/></svg><span>「せーの！」の あと、おなじ リズムで ボタンを おして プチッ！</span></li>
+        <li><svg class="ic" viewBox="0 0 30 30"><path d="M4 26a11 11 0 0 1 22 0z" fill="#FFD3B4" stroke="#3A2413" stroke-width="2.5"/><path d="M15 15c0-4 0-6 2-8a3 3 0 1 0-4-1" fill="none" stroke="#2A1A12" stroke-width="2.5" stroke-linecap="round"/></svg><span>くるくるの まきげは、ぬけるまで ながーく おしてね。</span></li>`,
+      ranks: ["けぬき名人！ ツルッツル！"],
+      reset() { lastPluckAt = lastMissAt = -9; },
+      build, phase, draw,
+      onHit(n, grade, t) { lastPluckAt = n.at; snd.pluck(t, grade); },
+      onMiss(n) { lastMissAt = n.at; },
+      floatXY(n) { if (!n) return { x: G.cx, y: G.cy - G.R - G.hl * 2.3 }; const o = G.pore(n.pos), rr = G.R + G.hl * 1.9; return { x: G.cx + Math.cos(o.a) * rr, y: G.cy + Math.sin(o.a) * rr }; }
+    };
+  })();
+
+  // =====================================================================
+  //  ゲーム2：カラテねこ（とんでくるものをパンチ）
+  // =====================================================================
+  const Karate = (() => {
+    const DIFF = { easy: [1, 2], normal: [1, 3], hard: [2, 3] };
+    // p=植木ばち(1拍でとどく) w=スイカ(2拍・ゆっくり) b=ボール(半拍・はやい)
+    const PAT = {
+      1: ["p...p...", "p.......", "....p...", "p...p...", "..p...p."],
+      2: ["p.p.p...", "w.......", "p...w...", "p.p.p.p.", "w...p..."],
+      3: ["p.pp..p.", "ppp.p...", "w.p.p...", "p.w...pp", "pp.p.p..", "w...pp.."]
+    };
+    const BALL = ["....b...", "....b.b.", "......b."]; // ボールは ほかと まぜない（前半は よこくの 時間）
+    const FLY = { p: 1, w: 2, b: .5 }; // 拍
+    let lastPunch = -9, lastBonk = -9, L = null;
+    const snd = {
+      throwP: (t) => { noise(t, .18, { gain: .18, type: "bandpass", freq: 700, f1: 2400, q: 2 }); tone(t, 520, .06, { gain: .1 }); },
+      throwW: (t) => { tone(t, 180, .35, { type: "triangle", f1: 320, gain: .25, attack: .02 }); noise(t, .3, { gain: .1, type: "lowpass", freq: 600 }); },
+      warn: (t, hi) => { tone(t, hi ? 1760 : 1320, .12, { type: "square", gain: .08 }); tone(t, hi ? 1760 : 1320, .14, { type: "triangle", gain: .12 }); },
+      throwB: (t) => noise(t, .1, { gain: .22, type: "bandpass", freq: 2000, f1: 5000, q: 3 }),
+      hitP: (t) => { noise(t, .22, { gain: .45, type: "highpass", freq: 2500 }); tone(t, 1200, .12, { type: "square", gain: .07 }); tone(t + .02, 1600, .15, { gain: .1 }); },
+      hitW: (t) => { noise(t, .18, { gain: .5, type: "lowpass", freq: 900 }); tone(t, 220, .15, { f1: 90, gain: .4 }); },
+      hitB: (t) => { tone(t, 1800, .35, { type: "triangle", gain: .25 }); tone(t, 2700, .25, { gain: .08 }); noise(t, .04, { gain: .4 }); },
+      punch: (t) => noise(t, .08, { gain: .18, type: "bandpass", freq: 900, f1: 300, q: 1.5 }),
+      bonk: (t) => { tone(t, 330, .18, { type: "square", f1: 120, gain: .12 }); tone(t + .12, 900, .3, { type: "triangle", f1: 1300, gain: .06 }); }
+    };
+    function build(t0) {
+      const p = S.per.karate, beat = 60 / p.bpm, bar = beat * 4, e = beat / 2;
+      const [lo, hi] = DIFF[p.diff], nBars = p.rounds * 2, notes = [];
+      const restEvery = p.diff === "easy" ? 2 : p.diff === "normal" ? 4 : 99;
+      let last = "", afterBall = false;
+      for (let k = 0; k < nBars; k++) {
+        if (k % restEvery === restEvery - 1) { afterBall = false; continue; } // ひと休み小節
+        const { lvl } = pickLevel(k, nBars, lo, hi);
+        let pat = k === 0 ? "p...p..." : pick(PAT[lvl], last);
+        if (p.diff === "hard" && lvl >= 3 && !afterBall && last && !BALL.includes(last) && Math.random() < .3) pat = pick(BALL);
+        else if (afterBall) pat = pick(["....p...", "....p.p.", "......p."]); // ボールの つぎは ゆとりを もって
+        afterBall = BALL.includes(pat); last = pat;
+        const bs = t0 + bar * (1 + k);
+        for (let i = 0; i < 8; i++) if (PAT[lvl] && pat[i] !== ".") {
+          const type = pat[i], t = bs + i * e;
+          notes.push({ type, t, throwT: t - FLY[type] * beat, state: null, grade: null, at: 0, spin: Math.random() < .5 ? -1 : 1 });
+        }
+      }
+      const endT = t0 + bar * (1 + nBars) + beat, ev = [];
+      songBgm(ev, t0, beat, nBars, "karate");
+      notes.forEach((n) => ev.push({ t: n.throwT, fn: (t) => (n.type === "w" ? snd.throwW : n.type === "b" ? snd.throwB : snd.throwP)(t) }));
+      // ボールは 2拍まえから「ピッ・ピッ」と よこく
+      notes.filter((n) => n.type === "b").forEach((n, i, arr) => {
+        if (i > 0 && n.t - arr[i - 1].t < beat * 2.1) return; // つづけて くる ときは 1回だけ
+        [2, 1].forEach((k) => ev.push({ t: n.t - k * beat, fn: (t) => snd.warn(t, k === 1) }));
+      });
+      ev.push({ t: endT, fn: (t) => { SND.kick(t); SND.fin(t); } });
+      return { t0, beat, bar, e, notes, endT, ev, nBars };
+    }
+    function phase(now) {
+      const pr = clamp((now - chart.t0 - chart.bar) / (chart.nBars * chart.bar)), n = 6, f = Math.round(pr * n);
+      roundLbl.textContent = "♪ きょく\n" + "▰".repeat(f) + "▱".repeat(n - f);
+      const flying = chart.notes.some((n) => !n.state && now >= n.throwT - .05 && now < n.t + .3);
+      const ball = chart.notes.some((n) => n.type === "b" && !n.state && now >= n.t - 2 * chart.beat && now < n.throwT);
+      setPhase(ball ? "ボールが くるぞ！" : flying ? "パンチ！" : "かまえて…", ball || flying);
+    }
+    function layout() {
+      const s = Math.min(cw * .42, ch * .5), floorY = ch * .86, catX = cw * .68;
+      return { s, floorY, catX, hx: catX - s * .64, hy: floorY - s * .56, sx: -s * .3, sy: floorY - s * .6 };
+    }
+    function drawDojo() {
+      const { floorY, s } = L;
+      g.fillStyle = "#F4E6C8"; g.fillRect(0, 0, cw, floorY);
+      g.fillStyle = "#E9D6AE";
+      for (let x = 0; x < cw; x += Math.max(60, cw / 5)) g.fillRect(x, 0, 3, floorY);
+      g.fillStyle = "#9C6B3C"; g.fillRect(0, floorY - s * 1.9, cw, 10); g.fillRect(0, floorY - 14, cw, 14);
+      // かけじく
+      const kx = cw * .22, kw = Math.min(70, cw * .15), ky = Math.max(10, floorY - s * 1.8);
+      g.fillStyle = "#FFFDF6"; g.strokeStyle = "#3A2413"; g.lineWidth = 3;
+      g.fillRect(kx - kw / 2, ky, kw, kw * 2); g.strokeRect(kx - kw / 2, ky, kw, kw * 2);
+      g.fillStyle = "#3A2413"; g.fillRect(kx - kw / 2 - 6, ky - 6, kw + 12, 8); g.fillRect(kx - kw / 2 - 6, ky + kw * 2, kw + 12, 8);
+      g.font = `${kw * .55}px ${FONT_DISP}`; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText("気", kx, ky + kw * .6); g.fillText("合", kx, ky + kw * 1.35);
+      // たたみ
+      g.fillStyle = "#C9B56A"; g.fillRect(0, floorY, cw, ch - floorY);
+      g.strokeStyle = "#8C7A3A"; g.lineWidth = 3;
+      for (let x = -40; x < cw; x += Math.max(90, cw / 3)) { g.beginPath(); g.moveTo(x, floorY); g.lineTo(x + 30, ch); g.stroke(); }
+      g.fillStyle = "#3A5A3A"; g.fillRect(0, floorY, cw, 6);
+    }
+    function drawCat(now, pose) {
+      const { s, floorY, catX: x } = L, lw = Math.max(2.5, s * .022);
+      const bob = chart && playing ? Math.abs(Math.sin(Math.PI * ((now - chart.t0) / chart.beat))) * s * .025 : Math.abs(Math.sin(now * 2.5)) * s * .015;
+      const INK = "#3A2413", FUR = "#FFFDF7", GI = "#FFFFFF", PAD = "#FFB3C6";
+      g.lineJoin = "round"; g.lineCap = "round"; g.strokeStyle = INK; g.lineWidth = lw;
+      // しっぽ
+      g.lineWidth = s * .07; g.strokeStyle = INK; g.beginPath(); g.moveTo(x + s * .2, floorY - s * .22); g.quadraticCurveTo(x + s * .5, floorY - s * .3, x + s * .42, floorY - s * .6 + Math.sin(now * 4) * s * .04); g.stroke();
+      g.lineWidth = s * .045; g.strokeStyle = "#F2A541"; g.stroke(); g.strokeStyle = INK; g.lineWidth = lw;
+      const limb = (pts, w, col) => { g.lineWidth = w + lw * 2; g.strokeStyle = INK; g.beginPath(); pts.forEach(([px, py], i) => i ? g.lineTo(px, py) : g.moveTo(px, py)); g.stroke(); g.lineWidth = w; g.strokeStyle = col; g.stroke(); g.strokeStyle = INK; g.lineWidth = lw; };
+      const paw = (px, py, r) => { g.fillStyle = FUR; g.beginPath(); g.arc(px, py, r, 0, 7); g.fill(); g.stroke(); g.fillStyle = PAD; g.beginPath(); g.arc(px - r * .3, py + r * .1, r * .3, 0, 7); g.fill(); };
+      const top = floorY - s * .62 + bob, bot = floorY - s * .2 + bob * .5;
+      // あし：まえに ふみだした かまえ（まえ足は まげて、うしろ足は のばす）
+      limb([[x - s * .08, bot], [x - s * .24, floorY - s * .14], [x - s * .3, floorY - s * .04]], s * .12, GI);
+      limb([[x + s * .08, bot], [x + s * .22, floorY - s * .1], [x + s * .3, floorY - s * .04]], s * .12, GI);
+      g.fillStyle = FUR; [[x - s * .33, floorY - s * .02], [x + s * .33, floorY - s * .02]].forEach(([fx0, fy0]) => { g.beginPath(); g.ellipse(fx0, fy0, s * .075, s * .035, 0, 0, 7); g.fill(); g.stroke(); });
+      // どうぎ
+      g.fillStyle = GI; g.beginPath();
+      g.moveTo(x - s * .19, top); g.quadraticCurveTo(x, top - s * .04, x + s * .19, top); g.lineTo(x + s * .22, bot); g.quadraticCurveTo(x, bot + s * .04, x - s * .22, bot); g.closePath(); g.fill(); g.stroke();
+      g.beginPath(); g.moveTo(x - s * .1, top + s * .01); g.lineTo(x + s * .02, top + s * .2); g.lineTo(x + s * .1, top + s * .01); g.stroke();
+      g.fillStyle = "#2A1A12"; g.fillRect(x - s * .22, bot - s * .1, s * .44, s * .055);
+      g.beginPath(); g.moveTo(x + s * .03, bot - s * .07); g.lineTo(x - s * .02, bot + s * .06); g.lineTo(x + s * .05, bot + s * .05); g.closePath(); g.fill();
+      // うしろの手：こしに ひいた「ひきて」
+      limb([[x + s * .14, top + s * .08], [x + s * .26, top + s * .24], [x + s * .17, bot - s * .1]], s * .09, GI);
+      paw(x + s * .15, bot - s * .1, s * .06);
+      // まえの手：かまえ（ひじを まげて こぶしを まえに）→ パンチで まっすぐ のばす
+      const punching = pose === "punch";
+      if (punching) {
+        limb([[x - s * .12, top + s * .08], [L.hx + s * .05, L.hy]], s * .095, GI);
+        paw(L.hx + s * .02, L.hy, s * .085);
+        g.lineWidth = 3; [-.12, 0, .12].forEach((d) => { g.beginPath(); g.moveTo(L.hx + s * .14, L.hy + d * s); g.lineTo(L.hx + s * .3, L.hy + d * s * 1.3); g.stroke(); }); g.lineWidth = lw;
+      } else {
+        limb([[x - s * .12, top + s * .08], [x - s * .2, top + s * .3], [x - s * .34, top + s * .14]], s * .095, GI);
+        paw(x - s * .35, top + s * .13, s * .07);
+      }
+      // あたま（おおきく まるく）
+      const R = s * .36, hx = x - s * .02, hy = floorY - s * .92 + bob;
+      [-1, 1].forEach((d) => {
+        g.fillStyle = d > 0 ? "#F2A541" : FUR;
+        g.beginPath(); g.moveTo(hx + d * R * .95, hy - R * .25); g.quadraticCurveTo(hx + d * R * 1.02, hy - R * 1.2, hx + d * R * .78, hy - R * 1.18); g.quadraticCurveTo(hx + d * R * .5, hy - R * 1.05, hx + d * R * .25, hy - R * .78); g.closePath(); g.fill(); g.stroke();
+        g.fillStyle = PAD; g.beginPath(); g.moveTo(hx + d * R * .8, hy - R * .5); g.quadraticCurveTo(hx + d * R * .85, hy - R * 1.0, hx + d * R * .72, hy - R * .98); g.quadraticCurveTo(hx + d * R * .52, hy - R * .88, hx + d * R * .4, hy - R * .72); g.closePath(); g.fill();
+      });
+      g.fillStyle = FUR; g.beginPath(); g.ellipse(hx, hy, R * 1.1, R * .92, 0, 0, 7); g.fill(); g.stroke();
+      g.save(); g.beginPath(); g.ellipse(hx, hy, R * 1.1, R * .92, 0, 0, 7); g.clip();
+      g.fillStyle = "#F2A541"; g.beginPath(); g.ellipse(hx + R * .7, hy - R * .55, R * .5, R * .38, .4, 0, 7); g.fill(); g.restore();
+      g.beginPath(); g.ellipse(hx, hy, R * 1.1, R * .92, 0, 0, 7); g.stroke();
+      // はちまき
+      g.fillStyle = "#E0463C"; g.save(); g.beginPath(); g.ellipse(hx, hy, R * 1.1, R * .92, 0, 0, 7); g.clip(); g.fillRect(hx - R * 1.2, hy - R * .62, R * 2.4, R * .2); g.restore();
+      const wave = Math.sin(now * 12) * R * .1;
+      g.beginPath(); g.moveTo(hx + R * 1.0, hy - R * .55); g.quadraticCurveTo(hx + R * 1.4, hy - R * .8 + wave, hx + R * 1.7, hy - R * .5 - wave); g.lineTo(hx + R * 1.65, hy - R * .36 - wave); g.quadraticCurveTo(hx + R * 1.35, hy - R * .55 + wave, hx + R * 1.0, hy - R * .42); g.fill();
+      // め
+      const ey = hy + R * .02, exs = [hx - R * .48, hx + R * .28];
+      g.fillStyle = INK; g.strokeStyle = INK;
+      exs.forEach((ex, i) => {
+        if (pose === "ouch") { g.lineWidth = lw; g.beginPath(); for (let k = 0; k <= 20; k++) { const a = k * .6, r = R * .01 * k * .7; k ? g.lineTo(ex + Math.cos(a) * r, ey + Math.sin(a) * r) : g.moveTo(ex, ey); } g.stroke(); }
+        else if (punching) { g.lineWidth = lw * 1.3; const d = i ? -1 : 1; g.beginPath(); g.moveTo(ex - d * R * .1, ey - R * .08); g.lineTo(ex + d * R * .06, ey); g.lineTo(ex - d * R * .1, ey + R * .08); g.stroke(); }
+        else {
+          g.beginPath(); g.ellipse(ex, ey, R * .13, R * .16, 0, 0, 7); g.fill();
+          g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(ex - R * .04, ey - R * .06, R * .05, 0, 7); g.fill(); g.beginPath(); g.arc(ex + R * .05, ey + R * .06, R * .022, 0, 7); g.fill(); g.fillStyle = INK;
+        }
+      });
+      // ほっぺ・はな・くち・ひげ
+      g.fillStyle = "rgba(255,140,160,.55)"; exs.forEach((ex) => { g.beginPath(); g.ellipse(ex - R * .05, ey + R * .3, R * .14, R * .08, 0, 0, 7); g.fill(); });
+      const nx = hx - R * .1, ny = hy + R * .22;
+      g.fillStyle = "#FF8FA3"; g.beginPath(); g.moveTo(nx - R * .07, ny); g.lineTo(nx + R * .07, ny); g.lineTo(nx, ny + R * .07); g.closePath(); g.fill();
+      g.lineWidth = lw; g.strokeStyle = INK;
+      if (punching) { g.fillStyle = "#C2445A"; g.beginPath(); g.moveTo(nx - R * .1, ny + R * .14); g.quadraticCurveTo(nx, ny + R * .36, nx + R * .1, ny + R * .14); g.closePath(); g.fill(); g.stroke(); }
+      else { g.beginPath(); g.moveTo(nx - R * .13, ny + R * .12); g.quadraticCurveTo(nx - R * .065, ny + R * .2, nx, ny + R * .1); g.quadraticCurveTo(nx + R * .065, ny + R * .2, nx + R * .13, ny + R * .12); g.stroke(); }
+      g.lineWidth = Math.max(1.5, lw * .6);
+      [[-1, -R * .95], [1, R * .8]].forEach(([d, ox]) => [-1, 1].forEach((k) => { g.beginPath(); g.moveTo(hx + ox * .72, ny + k * R * .05); g.lineTo(hx + ox, ny - R * .02 + k * R * .1); g.stroke(); }));
+      if (pose === "ouch") for (let i = 0; i < 3; i++) { const a = now * 6 + i * 2.1; bigText("★", hx + Math.cos(a) * R * 1.1, hy - R * 1.15 + Math.sin(a) * R * .25, R * .32, "#FFC94A"); }
+    }
+    function drawObj(type, x, y, r, rot) {
+      g.save(); g.translate(x, y); g.rotate(rot); g.strokeStyle = "#3A2413"; g.lineWidth = Math.max(2.5, r * .12); g.lineJoin = "round";
+      if (type === "p") {
+        g.fillStyle = "#3FAE4A"; [-.5, 0, .5].forEach((a) => { g.save(); g.rotate(a); g.beginPath(); g.ellipse(0, -r * 1.1, r * .22, r * .5, 0, 0, 7); g.fill(); g.stroke(); g.restore(); });
+        g.fillStyle = "#D9774A"; g.beginPath(); g.moveTo(-r * .8, -r * .45); g.lineTo(r * .8, -r * .45); g.lineTo(r * .6, r * .9); g.lineTo(-r * .6, r * .9); g.closePath(); g.fill(); g.stroke();
+        g.fillStyle = "#E88D5E"; g.fillRect(-r * .95, -r * .75, r * 1.9, r * .38); g.strokeRect(-r * .95, -r * .75, r * 1.9, r * .38);
+      } else if (type === "w") {
+        g.fillStyle = "#3E9E3E"; g.beginPath(); g.ellipse(0, 0, r, r * .88, 0, 0, 7); g.fill();
+        g.strokeStyle = "#1F5A26"; g.lineWidth = r * .14; [-.5, 0, .5].forEach((d) => { g.beginPath(); g.ellipse(d * r * .9, 0, r * .12, r * .8, 0, 0, 7); g.stroke(); });
+        g.strokeStyle = "#3A2413"; g.lineWidth = Math.max(2.5, r * .1); g.beginPath(); g.ellipse(0, 0, r, r * .88, 0, 0, 7); g.stroke();
+      } else {
+        g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill(); g.stroke();
+        g.strokeStyle = "#E0463C"; g.lineWidth = r * .14; g.beginPath(); g.arc(-r * 1.1, 0, r * .75, -.8, .8); g.stroke(); g.beginPath(); g.arc(r * 1.1, 0, r * .75, Math.PI - .8, Math.PI + .8); g.stroke();
+      }
+      g.restore();
+    }
+    const R_OF = (type) => L.s * (type === "w" ? .2 : type === "b" ? .09 : .15);
+    function objPos(n, now) {
+      const p = (now - n.throwT) / (n.t - n.throwT);
+      const arc = L.s * (n.type === "w" ? 1.1 : n.type === "b" ? .15 : .55);
+      return { x: lerp(L.sx, L.hx, p), y: lerp(L.sy, L.hy, p) - Math.sin(Math.PI * clamp(p)) * arc, p };
+    }
+    function draw(now) {
+      L = layout(); drawDojo();
+      const pose = (now - lastBonk < .5) ? "ouch" : (now - lastPunch < .15) ? "punch" : "idle";
+      drawCat(now, pose);
+      if (!chart) {
+        drawObj("p", L.hx - L.s * .3, L.hy - L.s * .25 + Math.sin(now * 3) * 6, L.s * .15, Math.sin(now) * .3);
+        return;
+      }
+      for (const n of chart.notes) {
+        if (now < n.throwT) {
+          if (n.type === "b" && now >= n.t - 2 * chart.beat) { // 左はしで ボールが ちらっと まってる
+            const r = R_OF("b"), wig = Math.sin(now * 20) * 3, k = clamp((now - (n.t - 2 * chart.beat)) / .2);
+            drawObj("b", lerp(-r * 2, r * 1.6, easeOut(k)) + wig, L.sy, r, 0);
+            const pul = 1 + .25 * Math.abs(Math.sin(Math.PI * ((now - n.t) / chart.beat)));
+            bigText("！", r * 1.6, L.sy - r * 2.6, Math.max(22, L.s * .2), "#E0463C", pul);
+          }
+          continue;
+        }
+        const r = R_OF(n.type);
+        if (n.state === "hit") {
+          const t = now - n.at; if (t > 1.1) continue;
+          if (n.type === "b") { // ホームラン
+            const x = L.hx - t * cw * 1.2, y = L.hy - t * ch * 1.3;
+            drawObj("b", x, y, r * (1 - t * .5), t * 20);
+            if (t < .5) bigText("カキーン！", L.hx - L.s * .2, L.hy - L.s * .55, Math.max(16, L.s * .13), "#E0463C");
+            continue;
+          }
+          const cols = n.type === "w" ? ["#3E9E3E", "#FF5A6E", "#FF5A6E", "#3E9E3E", "#FF5A6E"] : ["#D9774A", "#E88D5E", "#D9774A", "#3FAE4A", "#8A5A34"];
+          g.globalAlpha = clamp(1.4 - t * 1.4);
+          for (let i = 0; i < 5; i++) {
+            const a = -Math.PI / 2 - .9 + (i - 2) * .45, v = L.s * (2.4 + (i % 2) * .8), gr = L.s * 7;
+            const x = L.hx + Math.cos(a) * v * t, y = L.hy + Math.sin(a) * v * t + .5 * gr * t * t;
+            g.save(); g.translate(x, y); g.rotate(t * 10 * n.spin + i);
+            g.fillStyle = cols[i]; g.strokeStyle = "#3A2413"; g.lineWidth = 2.5;
+            g.beginPath(); g.moveTo(-r * .45, -r * .3); g.lineTo(r * .5, -r * .2); g.lineTo(r * .1, r * .45); g.closePath(); g.fill(); g.stroke();
+            g.restore();
+          }
+          g.globalAlpha = 1;
+          if (t < .35) { const sc = 1 + (1 - t / .35) * .4; bigText(n.type === "w" ? "ボコッ！" : "パカーン！", L.hx - L.s * .2, L.hy - L.s * .55, Math.max(16, L.s * .13), "#E0463C", sc); }
+          continue;
+        }
+        let { x, y, p } = objPos(n, now), rot = (now - n.throwT) * 6 * n.spin;
+        if (p > 1) { // とおりすぎて ゴチン → おちる
+          const t = now - n.t; if (t > 1.2) continue;
+          x = L.hx + L.s * .35 + t * L.s * .4; y = L.hy + (t * t) * L.s * 8 - t * L.s * 1.2; y = Math.min(y, L.floorY - r);
+        }
+        // かげ
+        g.fillStyle = "rgba(58,36,19,.18)"; g.beginPath(); g.ellipse(x, L.floorY + 4, r * (.6 + .4 * clamp(p)), r * .18, 0, 0, 7); g.fill();
+        drawObj(n.type, x, y, r, rot);
+      }
+    }
+    return {
+      id: "karate", name: "カラテねこ",
+      colors: { bg: "#F4E6C8", btn: "#FFC94A", btnDk: "#D39A12", floor: "#6B3F1F" },
+      pad: ["パンチ！", "とんできたら おす"],
+      titleHTML: '<span class="pop">パカーン！</span><br>カラテねこ',
+      howHTML: `<li><svg class="ic" viewBox="0 0 30 30"><path d="M8 11h12l-2 13h-8z" fill="#D9774A" stroke="#3A2413" stroke-width="2.5" stroke-linejoin="round"/><rect x="6" y="7" width="16" height="5" rx="1" fill="#E88D5E" stroke="#3A2413" stroke-width="2.5"/></svg><span>うえきばちが ヒュッと とんでくるよ。ねこの まえに きたら パンチ！</span></li>
+        <li><svg class="ic" viewBox="0 0 30 30"><ellipse cx="15" cy="15" rx="12" ry="10" fill="#3E9E3E" stroke="#3A2413" stroke-width="2.5"/><path d="M9 7v16M15 5v20M21 7v16" stroke="#1F5A26" stroke-width="2"/></svg><span>スイカは ふんわり ゆっくり。あわてずに まってね。</span></li>
+        <li><svg class="ic" viewBox="0 0 30 30"><circle cx="15" cy="15" r="11" fill="#fff" stroke="#3A2413" stroke-width="2.5"/><path d="M8 8c4 4 4 10 0 14M22 8c-4 4-4 10 0 14" fill="none" stroke="#E0463C" stroke-width="2"/></svg><span>ボールは はやいよ！「ピッ・ピッ」の あいずと「！」が でたら じゅんびしてね。（むずかしい ときだけ）</span></li>`,
+      ranks: ["カラテ名人！ おみごと！"],
+      reset() { lastPunch = lastBonk = -9; },
+      build, phase, draw,
+      onFree(now) { lastPunch = now; snd.punch(ac.currentTime); },
+      onHit(n, grade, t) { lastPunch = n.at; (n.type === "w" ? snd.hitW : n.type === "b" ? snd.hitB : snd.hitP)(t); if (grade === "bacchiri") tone(t + .05, midi(96), .12, { gain: .1 }); },
+      onMiss(n, t) { lastBonk = n.at; snd.bonk(t); },
+      floatXY() { return { x: L.hx - L.s * .1, y: L.hy - L.s * .95 }; }
+    };
+  })();
+
+  // =====================================================================
+  //  ゲーム3：ケロっと わくぐり（パ・ピ・プ・ペ・ポ！で ジャンプ）
+  // =====================================================================
+  const Kaeru = (() => {
+    const SYL = ["パ", "ピ", "プ", "ペ", "ポ"];
+    const DIFF = { easy: [1, 2], normal: [1, 3], hard: [2, 3] };
+    // パピプペポは いつも おなじ間かく。かわるのは「1文字の はやさ(sp)」と「つぎの わっかまでの 休み(rest)」（どちらも 8分音符いくつぶんか）
+    const PLAN = {
+      1: [{ sp: 2, rest: 8 }, { sp: 2, rest: 6 }],
+      2: [{ sp: 2, rest: 4 }, { sp: 2, rest: 8 }, { sp: 1, rest: 4 }, { sp: 1, rest: 8 }, { sp: 2, rest: 2 }],
+      3: [{ sp: 1, rest: 3 }, { sp: 1, rest: 2 }, { sp: 2, rest: 3 }, { sp: 3, rest: 5 }, { sp: 1, rest: 5 }, { sp: 3, rest: 3 }]
+    };
+    const PAL = [
+      { body: "#86D65B", belly: "#FFF6D8", flower: "#FF9EC4" },   // キミ
+      { body: "#6FD1A4", belly: "#F1FFF6", flower: "#FFD447" },   // なかま1
+      { body: "#B7DE5E", belly: "#FFFBE0", flower: "#8EC5FF" }    // なかま2
+    ];
+    let jumpAt = -9, lastBonk = -9, L = null;
+    const snd = {
+      syl: (t, k) => { const m = [72, 74, 76, 79][k]; noise(t, .02, { gain: .25, type: "bandpass", freq: 3000, q: 2 }); tone(t, midi(m) * 1.06, .1, { type: "square", f1: midi(m), gain: .09 }); tone(t, midi(m), .12, { type: "triangle", gain: .22 }); },
+      hop: (t) => tone(t, 500, .1, { f1: 900, gain: .08 }),
+      jump: (t) => tone(t, 380, .16, { f1: 1100, gain: .28 }),
+      kero: (t) => { tone(t + .03, 880, .05, { type: "square", f1: 700, gain: .08 }); tone(t + .1, 990, .07, { type: "square", f1: 760, gain: .08 }); tone(t + .05, midi(84), .25, { type: "triangle", gain: .15 }); },
+      boing: (t) => { const o = tone(t, 260, .35, { type: "triangle", f1: 140, gain: .25 }); const l = ac.createOscillator(), lg = ac.createGain(); l.frequency.value = 18; lg.gain.value = 50; l.connect(lg); lg.connect(o.frequency); l.start(t); l.stop(t + .35); }
+    };
+    function build(t0) {
+      const p = S.per.kaeru, beat = 60 / p.bpm, bar = beat * 4, e = beat / 2;
+      const [lo, hi] = DIFF[p.diff], nBars = p.rounds * 2, rings = [], ev = [];
+      const songStart = t0 + bar, songEnd = songStart + nBars * bar;
+      let cur = songStart, last = null, i = 0;
+      while (true) {
+        const pr = (cur - songStart) / (songEnd - songStart);
+        const maxL = Math.min(hi, lo + Math.floor((hi - lo + 1) * pr));
+        const lvl = (maxL > lo && Math.random() < .2) ? maxL - 1 : maxL;
+        const pl = i === 0 ? PLAN[1][0] : pick(PLAN[lvl], last); last = pl;
+        if (cur + 4 * pl.sp * e > songEnd - e) break;
+        const spT = pl.sp * e, times = [0, 1, 2, 3, 4].map((k) => cur + k * spT);
+        rings.push({ spT, cues: times.slice(0, 4), t: times[4], state: null, grade: null, at: 0, hue: i % 3 });
+        cur = times[4] + pl.rest * e; i++;
+      }
+      const endT = songEnd;
+      songBgm(ev, t0, beat, nBars, "kaeru");
+      rings.forEach((r) => { r.cues.forEach((c, k) => ev.push({ t: c, fn: (t) => snd.syl(t, k) })); [2, 3].forEach((k) => ev.push({ t: r.cues[k] + .01, fn: snd.hop })); });
+      ev.push({ t: endT, fn: (t) => { SND.kick(t); SND.fin(t); } });
+      return { t0, beat, bar, e, notes: rings, endT, ev, nBars };
+    }
+    const appear = (n) => n.cues[0] - n.spT * 1.2;
+    function curRing(now) { for (const n of chart.notes) if (now <= n.t + .35) return now >= appear(n) ? n : null; return null; }
+    function phase(now) {
+      const r = curRing(now), idx = chart.notes.indexOf(r);
+      const pr = clamp((now - chart.t0 - chart.bar) / (chart.nBars * chart.bar)), f = Math.round(pr * 6);
+      roundLbl.textContent = "♪ きょく\n" + "▰".repeat(f) + "▱".repeat(6 - f);
+      if (!r || now >= r.t + .35) { setPhase("つぎが くるよ", false); return; }
+      if (now < r.cues[0]) { setPhase("きいてね", false); return; }
+      let k = 0; for (let i = 0; i < 4; i++) if (now >= r.cues[i]) k = i;
+      setPhase(now >= r.t - .06 ? "ポ！" : SYL[k], now >= r.t - .06);
+    }
+    function layout() {
+      const s = Math.min(cw * .17, ch * .22), waterY = ch * .74, frogX = cw * .12, step = (cw * .98 - frogX) / 4;
+      return { s, waterY, frogX, step, ringY: waterY - s * 1.5, ry: s * .62, rx: s * .24, frogs: [frogX, frogX + step, frogX + 2 * step] };
+    }
+    function drawBg(now) {
+      const { waterY } = L;
+      const sky = g.createLinearGradient(0, 0, 0, waterY); sky.addColorStop(0, "#AEDFFF"); sky.addColorStop(1, "#E8F7FF");
+      g.fillStyle = sky; g.fillRect(0, 0, cw, waterY);
+      g.fillStyle = "rgba(255,255,255,.9)";
+      [[.2, .12], [.7, .22]].forEach(([fx, fy], i) => { const x = ((fx * cw + now * (10 + i * 6)) % (cw + 160)) - 80, y = fy * ch, r = 16;
+        g.beginPath(); g.arc(x, y, r, 0, 7); g.arc(x + r * 1.1, y - r * .4, r * 1.2, 0, 7); g.arc(x + r * 2.3, y, r, 0, 7); g.fill(); });
+      g.fillStyle = "#9ED28A"; g.beginPath(); g.moveTo(0, waterY); g.quadraticCurveTo(cw * .3, waterY - ch * .16, cw * .6, waterY - ch * .04); g.quadraticCurveTo(cw * .85, waterY - ch * .12, cw, waterY - ch * .05); g.lineTo(cw, waterY); g.fill();
+      g.fillStyle = "#5FB6E6"; g.fillRect(0, waterY, cw, ch - waterY);
+      g.strokeStyle = "#8FD0F2"; g.lineWidth = 3;
+      for (let i = 0; i < 6; i++) { const y = waterY + 14 + i * 16, off = (now * 20 + i * 40) % 80; g.beginPath(); for (let x = -80 + off; x < cw; x += 80) { g.moveTo(x, y); g.quadraticCurveTo(x + 20, y - 5, x + 40, y); } g.stroke(); }
+      g.fillStyle = "#5CB85C"; g.strokeStyle = "#2F6B2F"; g.lineWidth = 3;
+      L.frogs.forEach((fx) => { g.beginPath(); g.ellipse(fx, waterY + 6, L.s * .6, L.s * .15, 0, .25, Math.PI * 2 - .05); g.lineTo(fx, waterY + 6); g.closePath(); g.fill(); g.stroke(); });
+    }
+    const JUMP = .38, jumpP = (ja, now) => { const jt = now - ja; return jt >= 0 && jt < JUMP ? jt / JUMP : -1; };
+    function drawFrog(x, now, mood, ja, pal) {
+      const { s, waterY } = L;
+      const jp = jumpP(ja, now), H = (waterY - s * .3) - L.ringY;
+      const off = jp >= 0 ? -4 * H * jp * (1 - jp) : 0;
+      const beatSq = chart && playing ? Math.abs(Math.sin(Math.PI * ((now - chart.t0) / chart.beat))) * .05 : Math.abs(Math.sin(now * 3 + x)) * .03;
+      const sy = jp >= 0 ? 1.08 : 1 - beatSq, sx = 1 / Math.sqrt(sy);
+      const by = waterY - s * .3 + off, lw = Math.max(2.5, s * .03);
+      g.save(); g.translate(x, by); g.scale(sx, sy);
+      g.lineJoin = "round"; g.lineCap = "round"; g.strokeStyle = "#3A2413"; g.lineWidth = lw;
+      g.fillStyle = pal.body;
+      if (jp >= 0) {
+        [-1, 1].forEach((d) => { g.beginPath(); g.ellipse(d * s * .13, s * .36, s * .07, s * .15, d * .25, 0, 7); g.fill(); g.stroke(); });
+        [-1, 1].forEach((d) => { g.beginPath(); g.ellipse(d * s * .34, -s * .02, s * .06, s * .12, -d * .9, 0, 7); g.fill(); g.stroke(); });
+      } else [-1, 1].forEach((d) => { g.beginPath(); g.ellipse(d * s * .2, s * .27, s * .13, s * .07, 0, 0, 7); g.fill(); g.stroke(); });
+      g.beginPath(); g.ellipse(0, s * .14, s * .27, s * .2, 0, 0, 7); g.fill(); g.stroke();
+      g.fillStyle = pal.belly; g.beginPath(); g.ellipse(0, s * .18, s * .16, s * .12, 0, 0, 7); g.fill();
+      g.fillStyle = pal.body; g.beginPath(); g.ellipse(0, -s * .1, s * .42, s * .28, 0, 0, 7); g.fill(); g.stroke();
+      [-1, 1].forEach((d) => {
+        const ex = d * s * .21, ey = -s * .33;
+        g.fillStyle = pal.body; g.beginPath(); g.arc(ex, ey, s * .14, Math.PI * .92, Math.PI * 2.08); g.fill(); g.stroke();
+        g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(ex, ey, s * .105, 0, 7); g.fill();
+        g.fillStyle = "#3A2413";
+        if (mood === "bonk") { g.beginPath(); g.moveTo(ex - s * .05, ey - s * .04); g.lineTo(ex + s * .05, ey + s * .04); g.moveTo(ex + s * .05, ey - s * .04); g.lineTo(ex - s * .05, ey + s * .04); g.stroke(); }
+        else if (mood === "happy") { g.lineWidth = lw * 1.2; g.beginPath(); g.arc(ex, ey + s * .03, s * .055, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); g.lineWidth = lw; }
+        else {
+          g.beginPath(); g.arc(ex + d * s * .01, ey + s * .01, s * .075, 0, 7); g.fill();
+          g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(ex + d * s * .01 - s * .025, ey - s * .02, s * .027, 0, 7); g.fill();
+          g.beginPath(); g.arc(ex + d * s * .01 + s * .025, ey + s * .03, s * .012, 0, 7); g.fill();
+        }
+      });
+      g.fillStyle = mood === "happy" ? "rgba(255,120,150,.8)" : "rgba(255,140,160,.6)";
+      [-1, 1].forEach((d) => { g.beginPath(); g.ellipse(d * s * .27, -s * .03, s * .07, s * .045, 0, 0, 7); g.fill(); });
+      if (mood === "bonk") { g.fillStyle = "#C2445A"; g.beginPath(); g.ellipse(0, -s * .02, s * .045, s * .04, 0, 0, 7); g.fill(); g.stroke(); }
+      else if (mood === "happy" || jp >= 0) { g.fillStyle = "#C2445A"; g.beginPath(); g.moveTo(-s * .07, -s * .05); g.quadraticCurveTo(0, s * .06, s * .07, -s * .05); g.closePath(); g.fill(); g.stroke(); }
+      else { g.beginPath(); g.moveTo(-s * .06, -s * .045); g.quadraticCurveTo(-s * .03, -s * .01, 0, -s * .04); g.quadraticCurveTo(s * .03, -s * .01, s * .06, -s * .045); g.stroke(); }
+      const fx = s * .1, fy = -s * .4;
+      g.fillStyle = pal.flower; g.lineWidth = lw * .7;
+      for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5 + now * .5; g.beginPath(); g.ellipse(fx + Math.cos(a) * s * .045, fy + Math.sin(a) * s * .045, s * .04, s * .028, a, 0, 7); g.fill(); g.stroke(); }
+      g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(fx, fy, s * .025, 0, 7); g.fill();
+      g.restore();
+    }
+    // わっかは 止まらず 一定の速さ。パ→画面の右はし、プ→なかま2、ペ→なかま1、ポ→キミ の まえを とおる
+    function ringX(n, now) { return L.frogX + (n.t - now) / n.spT * L.step; }
+    const RING_COL = [["#E0463C", "#FFF1E6"], ["#1C7ED6", "#E7F5FF"], ["#F59F00", "#FFF9DB"]];
+    function drawRingHalf(x, n, front, now) {
+      const { ringY: y, rx, ry } = L, [c1, c2] = RING_COL[n.hue];
+      const wob = n.state === "missed" && now - n.at < .6 ? Math.sin((now - n.at) * 30) * .15 * (1 - (now - n.at) / .6) : 0;
+      let sx = 1, sc = 1;
+      if (n.state === "hit") { const t = now - n.at; sc = 1 + .15 * Math.sin(Math.PI * clamp(t / .3)); }
+      g.save(); g.translate(x, y); g.rotate(wob); g.scale(sx * sc, sc);
+      const a0 = front ? -Math.PI / 2 : Math.PI / 2, a1 = front ? Math.PI / 2 : Math.PI * 1.5;
+      g.lineCap = "butt";
+      g.strokeStyle = "#3A2413"; g.lineWidth = ry * .26; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, a0, a1); g.stroke();
+      g.strokeStyle = c1; g.lineWidth = ry * .18; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, a0, a1); g.stroke();
+      g.strokeStyle = c2; g.lineWidth = ry * .18; g.setLineDash([ry * .16, ry * .22]); g.beginPath(); g.ellipse(0, 0, rx, ry, 0, a0, a1); g.stroke(); g.setLineDash([]);
+      if (n.state === "hit" && now - n.at < .5) for (let i = 0; i < 6; i++) { const a = i * 1.05 + (now - n.at) * 4, rr = ry * (1 + (now - n.at) * 1.5); bigText("✦", Math.cos(a) * rr * .6, Math.sin(a) * rr, ry * .25, "#F59F00"); }
+      g.restore();
+    }
+    function drawSylBar(now, n) {
+      if (!n || now < appear(n) || now > n.t + .4) return;
+      // もじの間かくを リズムどおりに ならべる
+      const y = Math.max(26, L.ringY - L.ry - L.s * .8), w = Math.min(cw - 70, 300), x0 = cw / 2 - w / 2;
+      for (let i = 0; i < 5; i++) {
+        const tt = i < 4 ? n.cues[i] : n.t, on = now >= tt - .01, justNow = on && now - tt < .15;
+        const sc = justNow ? 1.35 - (now - tt) / .15 * .35 : 1;
+        const col = i === 4 ? (on ? "#E0463C" : "rgba(224,70,60,.35)") : on ? "#3A2413" : "rgba(58,36,19,.25)";
+        bigText(SYL[i], x0 + w * i / 4, y, Math.max(20, Math.min(32, cw * .07)) * (i === 4 ? 1.15 : 1), col, sc);
+      }
+    }
+    function cpuJumpAt(k, now) { // なかまは プ(2)・ペ(3) で とぶ
+      let ja = -9; for (const n of chart.notes) { const t = n.cues[k] - JUMP / 2; if (t <= now && t > ja) ja = t; } return ja;
+    }
+    function draw(now) {
+      L = layout(); drawBg(now);
+      const pmood = now - lastBonk < .5 ? "bonk" : chart && chart.notes.some((n) => n.state === "hit" && now - n.at < .6) ? "happy" : "normal";
+      if (!chart) {
+        const n = { hue: 0, state: null }, x = L.frogs[1] + Math.sin(now * 1.5) * 6;
+        drawRingHalf(x, n, false, now);
+        drawFrog(L.frogs[2], now, "normal", -9, PAL[2]); drawFrog(L.frogs[1], now, "normal", -9, PAL[1]); drawFrog(L.frogX, now, "normal", -9, PAL[0]);
+        drawRingHalf(x, n, true, now);
+        bigText("キミ", L.frogX, L.waterY - L.s * 1.05, Math.max(13, L.s * .2), "#E0463C");
+        return;
+      }
+      const vis = chart.notes.map((n) => ({ n, x: ringX(n, now) })).filter((o) => o.x > -L.rx * 4 && o.x < cw + L.rx * 4);
+      vis.forEach((o) => drawRingHalf(o.x, o.n, false, now));
+      const passing = chart.notes.find((n) => n.state === "hit" && now - n.at < .35);
+      if (passing) { // くぐった しゅんかん：わっかの中が ひかる
+        const t = now - passing.at, rx = ringX(passing, now);
+        g.save(); g.globalAlpha = clamp(1 - t / .35);
+        g.fillStyle = "rgba(255,244,180,.85)"; g.beginPath(); g.ellipse(rx, L.ringY, L.rx * .8, L.ry * .85, 0, 0, 7); g.fill();
+        g.strokeStyle = "#FFFFFF"; g.lineWidth = 4; g.lineCap = "round";
+        for (let i = -1; i <= 1; i++) { g.beginPath(); g.moveTo(L.frogX + i * L.s * .2, L.ringY + L.s * .45); g.lineTo(L.frogX + i * L.s * .2, L.ringY + L.s * (.8 + t)); g.stroke(); }
+        g.restore();
+      }
+      const jA = cpuJumpAt(2, now), jB = cpuJumpAt(3, now);
+      drawFrog(L.frogs[2], now, jumpP(jA, now) >= 0 ? "happy" : "normal", jA, PAL[2]);
+      drawFrog(L.frogs[1], now, jumpP(jB, now) >= 0 ? "happy" : "normal", jB, PAL[1]);
+      drawFrog(L.frogX, now, pmood, jumpAt, PAL[0]);
+      vis.forEach((o) => drawRingHalf(o.x, o.n, true, now));
+      if (now < chart.t0 + chart.bar * 2) bigText("キミ", L.frogX, L.waterY - L.s * 1.05, Math.max(13, L.s * .2), "#E0463C");
+      drawSylBar(now, curRing(now));
+      if (lastBonk > 0 && now - lastBonk < .4) bigText("ボヨン", L.frogX + L.s * .45, L.ringY, Math.max(15, L.s * .22), "#1C7ED6");
+    }
+    return {
+      id: "kaeru", name: "わくぐり",
+      colors: { bg: "#CDEBFF", btn: "#8FDB6A", btnDk: "#4E9E36", floor: "#2F6FA3" },
+      pad: ["ジャンプ！", "「ポ」で おす"],
+      titleHTML: '<span class="pop">ケロっと！</span><br>わくぐり',
+      howHTML: `<li><svg class="ic" viewBox="0 0 30 30"><circle cx="15" cy="15" r="13" fill="#CDEBFF" stroke="#3A2413" stroke-width="2.5"/><path d="M11 10v10M15 8v14M19 11v8" stroke="#3A2413" stroke-width="2.5" stroke-linecap="round"/></svg><span>「パ・ピ・プ・ペ」の あいずで、わっかが ちかづいて くるよ。</span></li>
+        <li><svg class="ic" viewBox="0 0 30 30"><ellipse cx="9" cy="19" rx="6" ry="5" fill="#B7DE5E" stroke="#3A2413" stroke-width="2"/><ellipse cx="21" cy="19" rx="6" ry="5" fill="#6FD1A4" stroke="#3A2413" stroke-width="2"/></svg><span>まえの なかまが「プ」と「ペ」で じゅんばんに くぐるよ。</span></li>
+        <li><svg class="ic" viewBox="0 0 30 30"><ellipse cx="15" cy="17" rx="11" ry="8" fill="#86D65B" stroke="#3A2413" stroke-width="2.5"/><circle cx="10" cy="9" r="4" fill="#fff" stroke="#3A2413" stroke-width="2"/><circle cx="20" cy="9" r="4" fill="#fff" stroke="#3A2413" stroke-width="2"/></svg><span>さいごの「ポ！」で キミが ジャンプ！ パピプペポの はやさや、つぎが くるまでの 間が かわるよ。</span></li>`,
+      ranks: ["わくぐり名人！ ケロケロ〜！"],
+      reset() { jumpAt = lastBonk = -9; },
+      build, phase, draw,
+      onFree(now) { if (now - jumpAt > .3) { jumpAt = now; snd.jump(ac.currentTime); } },
+      onHit(n, grade, t) { jumpAt = Math.min(n.at, n.t) - JUMP * .45; snd.jump(t); snd.kero(t); if (grade === "bacchiri") tone(t + .12, midi(96), .12, { gain: .1 }); },
+      onMiss(n, t) { lastBonk = n.at; snd.boing(t); },
+      hitText(n, grade) { return grade === "bacchiri" ? "くぐった！" : GRADE_TXT[grade][0]; },
+      floatXY() { return { x: L.frogX + L.s * .4, y: L.ringY - L.ry - L.s * .15 }; }
+    };
+  })();
+
+  const GAMES = { keneki: Keneki, karate: Karate, kaeru: Kaeru };
+
+  // ---------- UI ----------
+  function syncSettingsUI() {
+    const p = P();
+    $("setTitle").textContent = `せってい（${game.name}）`;
+    $("set-bpm").value = p.bpm; $("bpmOut").textContent = p.bpm + " BPM";
+    $("diff-" + p.diff).checked = true; $("judge-" + S.judge).checked = true; $("rounds-" + p.rounds).checked = true;
+    ($("gap-" + S.gap) || $("gap-4")).checked = true; $("set-guide").checked = S.guide;
+    $("set-offset").value = S.offset; $("offOut").textContent = (S.offset > 0 ? "+" : "") + S.offset + " ms";
+    document.querySelectorAll("[data-only]").forEach((el) => el.hidden = el.dataset.only !== game.id);
+  }
+  $("set-bpm").addEventListener("input", (e) => { P().bpm = +e.target.value; syncSettingsUI(); save(); });
+  $("set-offset").addEventListener("input", (e) => { S.offset = +e.target.value; syncSettingsUI(); save(); });
+  $("set-guide").addEventListener("change", (e) => { S.guide = e.target.checked; save(); });
+  document.querySelectorAll("input[name=diff]").forEach((el) => el.addEventListener("change", () => { P().diff = el.value; save(); }));
+  document.querySelectorAll("input[name=judge]").forEach((el) => el.addEventListener("change", () => { S.judge = el.value; save(); }));
+  document.querySelectorAll("input[name=rounds]").forEach((el) => el.addEventListener("change", () => { P().rounds = +el.value; save(); }));
+  document.querySelectorAll("input[name=gap]").forEach((el) => el.addEventListener("change", () => { S.gap = +el.value; save(); }));
+
+  let settingsReturn = titleOv;
+  const openSettings = (from) => { settingsReturn = from; from.hidden = true; syncSettingsUI(); settingsOv.hidden = false; };
+  $("toSettings").addEventListener("click", () => openSettings(titleOv));
+  $("resSettings").addEventListener("click", () => openSettings(resultOv));
+  $("settingsDone").addEventListener("click", () => { settingsOv.hidden = true; settingsReturn.hidden = false; });
+  $("startBtn").addEventListener("click", startGame);
+  $("retryBtn").addEventListener("click", startGame);
+  $("toMenu").addEventListener("click", openMenu);
+  $("resMenu").addEventListener("click", openMenu);
+  quitBtn.addEventListener("click", quit);
+  document.querySelectorAll("#diffPick button").forEach((b) => b.addEventListener("click", () => { S.per[game.id].diff = b.dataset.diff; save(); renderHS(); }));
+  document.querySelectorAll(".gamebtn").forEach((b) => b.addEventListener("click", () => openGame(b.dataset.game)));
+
+  renderHS(); applyTheme(); resize(); requestAnimationFrame(frame);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(resize);
+})();
+</script>
+</body>
+</html>
