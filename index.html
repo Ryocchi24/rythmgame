@@ -196,6 +196,7 @@
         <button class="btn sub" id="toSettings">せってい</button>
         <button class="btn" id="startBtn">あそぶ！</button>
       </div>
+      <p class="note" id="startNote" hidden style="color:#E0463C">おとが とまっていたよ。もういちど「あそぶ！」を おしてね。</p>
       <button class="back" id="toMenu">← ゲームを えらびなおす</button>
     </div>
   </div>
@@ -322,8 +323,12 @@
   const easeOut = (x) => 1 - Math.pow(1 - clamp(x), 3);
 
   // ---------- Audio ----------
-  let ac = null, master = null;
+  let ac = null, master = null, audioBroken = false, noiseBuf = null;
   function ensureAudio() {
+    // iPhone では ほかのアプリや 画面ロックの あと「interrupted」で とまったままに なることがある
+    // → とまっていたら つくりなおす（ボタンを おした しゅんかんに やらないと 音が でないので ここで）
+    if (ac && (audioBroken || (ac.state !== "running" && ac.state !== "suspended"))) { try { ac.close(); } catch (e) {} ac = null; noiseBuf = null; }
+    audioBroken = false;
     if (!ac) {
       ac = new (window.AudioContext || window.webkitAudioContext)();
       const b = ac.createBuffer(1, 1, 22050), s = ac.createBufferSource(); s.buffer = b; s.connect(ac.destination); s.start(0);
@@ -333,7 +338,6 @@
     master = ac.createGain(); master.gain.value = 0.9; master.connect(comp);
   }
   const outLat = () => (ac ? (ac.outputLatency || ac.baseLatency || 0) : 0);
-  let noiseBuf = null;
   function getNoise() {
     if (!noiseBuf) { noiseBuf = ac.createBuffer(1, ac.sampleRate * 0.5, ac.sampleRate); const d = noiseBuf.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; }
     return noiseBuf;
@@ -452,7 +456,7 @@ function songBgm(ev, t0, beat, nBars, style) {
   function openGame(id) {
     stopPlay(); game = GAMES[id]; chart = null; game.reset?.(); applyTheme();
     $("gTitle").innerHTML = game.titleHTML; $("gHow").innerHTML = game.howHTML; renderHS();
-    menuOv.hidden = resultOv.hidden = settingsOv.hidden = true; titleOv.hidden = false;
+    menuOv.hidden = resultOv.hidden = settingsOv.hidden = true; $("startNote").hidden = true; titleOv.hidden = false;
   }
   function startGame() {
     ensureAudio();
@@ -463,9 +467,16 @@ function songBgm(ev, t0, beat, nBars, style) {
     sched = chart.ev; si = 0;
     floaters = []; combo = 0; holds.clear(); lastPhase = ""; celebrateAt = -99; strays = 0;
     playing = true;
-    menuOv.hidden = titleOv.hidden = resultOv.hidden = settingsOv.hidden = true;
+    menuOv.hidden = titleOv.hidden = resultOv.hidden = settingsOv.hidden = true; $("startNote").hidden = true;
     quitBtn.hidden = false; comboEl.textContent = "";
     clearInterval(schedTimer); schedTimer = setInterval(pump, 25); pump();
+    // 音の とけいが すすまない（= 音が とまっている）ときは、タイトルに もどして もういちど おしてもらう
+    const acAt = ac.currentTime, myChart = chart;
+    setTimeout(() => {
+      if (!playing || chart !== myChart || ac.currentTime > acAt) return;
+      audioBroken = true; stopPlay(); chart = null; game.reset?.(); applyTheme();
+      $("startNote").hidden = false; titleOv.hidden = false;
+    }, 800);
   }
   function pump() {
     if (!playing) return;
