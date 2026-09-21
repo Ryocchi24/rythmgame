@@ -16,14 +16,15 @@
 - 外部読み込みは Google Fonts（Mochiy Pop One / M PLUS Rounded 1c）のみ。
 - 絵はすべて Canvas 2D でコード描画、音はすべて Web Audio API で合成（音声ファイルなし）。
 - 保存は `localStorage`：
-  - `tenkomori-settings` … 設定（タイミング補正・けぬきの「せーの」とガイド、ゲームごとの BPM／難易度／長さ）
+  - `tenkomori-settings` … 設定（けぬきの「せーの」とガイド、ゲームごとの BPM／難易度／長さ）
   - `tenkomori-highscore` … `{ gameId: { easy, normal, hard } }` 難易度ごとのハイスコア
 
 ### コードの地図（`<script>` 内）
 
 1. **共通エンジン**
    - 音：`tone()` `noise()` `voice(t, 母音, f0, dur)`（フォルマント合成の こえ。わくぐりの「パピプペポ」。母音ごとの音量は `VOWEL_NORM` で そろえてある） `SND` `bgm()`（ループ伴奏） `songBgm(ev, t0, beat, nBars, style)`（Aメロ→Bメロ→サビの1曲。style = `"karate"` 短調 / `"kaeru"` 長調）
-   - 時間：すべて `AudioContext.currentTime` 基準。`vnow()`＝画面表示用（出力遅延を引く）、`inTime()`＝入力判定用（出力遅延＋タイミング補正を引く）。
+   - 時間：すべて `AudioContext.currentTime` 基準。`vnow()`＝画面表示用（出力遅延を引く）、`inTime()`＝入力判定用（出力遅延を引く。タイミング補正の設定は依頼者の希望で廃止）。
+   - 音の道：ゲームの音は `master`（`startGame` のたびに `newMaster()` で作り直し、やめるときは丸ごと無音に）。ボタンの効果音 `uiSound(kind)` は別の `uiBus` を通すので、やめた直後でも鳴る。種類：tap（ふつう）/ pick（ゲームを選ぶ）/ go（あそぶ・もういちど）/ back（もどる・やめる）/ tick（切りかえ）。
    - スケジューラ：`chart.ev`（{t, fn}）を 25ms ごとに先読み 0.2 秒で鳴らす `pump()`。
    - 判定：`press()` / `release()`（長押し）/ `hit()` / `miss()`。判定窓は `JUDGE`（全員同じ基準で固定。設定の「タイミングのきびしさ」は依頼者の希望で廃止）。どのノーツにも当たらない押下は「からぶり」（`strays`、1回 `STRAY_PENALTY` 点減点）。
    - 採点 `finish()`：バッチリ＝100 − ずれ量に応じて最大12点減、OK 55、おしい 20、ミス 0。全部バッチリ＆からぶり0のときだけ 100 点（それ以外は最大 99）。
