@@ -218,14 +218,6 @@
         </div>
       </div>
       <div class="field">
-        <div class="lab">タイミングのきびしさ</div>
-        <div class="seg" role="radiogroup">
-          <input type="radio" name="judge" id="judge-easy" value="easy"><label for="judge-easy">やさしい</label>
-          <input type="radio" name="judge" id="judge-normal" value="normal"><label for="judge-normal">ふつう</label>
-          <input type="radio" name="judge" id="judge-hard" value="hard"><label for="judge-hard">きびしい</label>
-        </div>
-      </div>
-      <div class="field">
         <div class="lab">ながさ</div>
         <div class="seg" role="radiogroup">
           <input type="radio" name="rounds" id="rounds-6" value="6"><label for="rounds-6">みじかい</label>
@@ -283,7 +275,7 @@
   //  共通エンジン
   // =====================================================================
   const GDEF = { bpm: 96, diff: "easy", rounds: 8 };
-  const DEFAULTS = { judge: "easy", offset: 0, gap: 4, guide: true, per: { keneki: { ...GDEF }, karate: { ...GDEF }, kaeru: { ...GDEF } } };
+  const DEFAULTS = { offset: 0, gap: 4, guide: true, per: { keneki: { ...GDEF }, karate: { ...GDEF }, kaeru: { ...GDEF } } };
   let S = JSON.parse(JSON.stringify(DEFAULTS));
   try {
     const raw = localStorage.getItem("tenkomori-settings");
@@ -308,7 +300,8 @@
   }
   const P = () => S.per[game.id];
 
-  const JUDGE = { easy: { p: .055, o: .1, a: .18 }, normal: { p: .042, o: .08, a: .14 }, hard: { p: .03, o: .06, a: .1 } };
+  // はんていの まど（びょう）：p=バッチリ o=OK a=おしい。みんな おなじ きじゅんで あそぶ（せっていでは かえない）
+  const JUDGE = { p: .055, o: .1, a: .18 };
   const STRAY_PENALTY = 50; // からぶり1回で ひく点（1つぶんの 100点満点に対して）
   const GRADE_TXT = { bacchiri: ["バッチリ！", "#2F9E44"], ok: ["OK", "#1C7ED6"], oshii: ["おしい", "#E8590C"], miss: ["ミス", "#868E96"] };
   const FONT_DISP = "\"Mochiy Pop One\", sans-serif";
@@ -495,7 +488,7 @@ function songBgm(ev, t0, beat, nBars, style) {
     all.forEach((n) => cnt[n.grade || "miss"]++);
     // バッチリでも ずれた ぶんだけ 少し へる → ぜんぶ ど真ん中で やっと 100点
     const pts = { ok: 55, oshii: 20, miss: 0 };
-    const J = JUDGE[S.judge];
+    const J = JUDGE;
     const pt = (n) => n.grade === "bacchiri" ? 100 - 12 * clamp((n.dev || 0) / J.p) : pts[n.grade || "miss"];
     const raw = all.reduce((s, n) => s + pt(n), 0) - strays * STRAY_PENALTY;
     let score = Math.max(0, Math.floor(raw / Math.max(1, all.length)));
@@ -523,7 +516,7 @@ function songBgm(ev, t0, beat, nBars, style) {
   const vnow = () => (ac ? ac.currentTime - outLat() : performance.now() / 1000);
   function press(id) {
     if (!playing) return;
-    const t = inTime(), J = JUDGE[S.judge];
+    const t = inTime(), J = JUDGE;
     let best = null, bd = 1e9;
     for (const n of chart.notes) {
       if (n.state) continue;
@@ -548,7 +541,7 @@ function songBgm(ev, t0, beat, nBars, style) {
     const n = holds.get(id); if (!n) return;
     holds.delete(id);
     if (n.state !== "holding") return;
-    if (inTime() >= n.endT - JUDGE[S.judge].a * .8) hit(n, n.grade);
+    if (inTime() >= n.endT - JUDGE.a * .8) hit(n, n.grade);
     else { stopHoldSound(n); miss(n, "はなしちゃった"); }
   }
   function stopHoldSound(n) { try { n.snd && n.snd.stop(); } catch (e) {} n.snd = null; }
@@ -682,7 +675,7 @@ function songBgm(ev, t0, beat, nBars, style) {
     g.clearRect(0, 0, cw, ch);
     if (!game) { drawMenuBg(now); return; }
     if (playing && chart) {
-      const J = JUDGE[S.judge], ti = inTime();
+      const J = JUDGE, ti = inTime();
       for (const n of chart.notes) {
         if (!n.state && ti > n.t + J.a) miss(n);
         if (n.state === "holding" && ti >= n.endT) { for (const [k, v] of holds) if (v === n) holds.delete(k); hit(n, n.grade); }
@@ -1586,7 +1579,7 @@ function songBgm(ev, t0, beat, nBars, style) {
     const p = P();
     $("setTitle").textContent = `せってい（${game.name}）`;
     $("set-bpm").value = p.bpm; $("bpmOut").textContent = p.bpm + " BPM";
-    $("diff-" + p.diff).checked = true; $("judge-" + S.judge).checked = true; $("rounds-" + p.rounds).checked = true;
+    $("diff-" + p.diff).checked = true; $("rounds-" + p.rounds).checked = true;
     ($("gap-" + S.gap) || $("gap-4")).checked = true; $("set-guide").checked = S.guide;
     $("set-offset").value = S.offset; $("offOut").textContent = (S.offset > 0 ? "+" : "") + S.offset + " ms";
     document.querySelectorAll("[data-only]").forEach((el) => el.hidden = el.dataset.only !== game.id);
@@ -1595,7 +1588,6 @@ function songBgm(ev, t0, beat, nBars, style) {
   $("set-offset").addEventListener("input", (e) => { S.offset = +e.target.value; syncSettingsUI(); save(); });
   $("set-guide").addEventListener("change", (e) => { S.guide = e.target.checked; save(); });
   document.querySelectorAll("input[name=diff]").forEach((el) => el.addEventListener("change", () => { P().diff = el.value; save(); }));
-  document.querySelectorAll("input[name=judge]").forEach((el) => el.addEventListener("change", () => { S.judge = el.value; save(); }));
   document.querySelectorAll("input[name=rounds]").forEach((el) => el.addEventListener("change", () => { P().rounds = +el.value; save(); }));
   document.querySelectorAll("input[name=gap]").forEach((el) => el.addEventListener("change", () => { S.gap = +el.value; save(); }));
 
