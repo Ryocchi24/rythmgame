@@ -563,11 +563,66 @@ function songBgm(ev, t0, beat, nBars, style) {
     return { maxL, lvl };
   }
   const pick = (arr, not) => { let v; do { v = arr[Math.floor(Math.random() * arr.length)]; } while (v === not && arr.length > 1); return v; };
+  // 文字：くろフチ → しろフチ → 色（まんがの かきもじ ふう）
   function bigText(label, x, y, size, color, sc = 1) {
     g.save(); g.translate(x, y); g.scale(sc, sc);
-    g.font = `${size}px ${FONT_DISP}`; g.textAlign = "center"; g.textBaseline = "middle";
-    g.lineWidth = Math.max(5, size * .28); g.lineJoin = "round"; g.strokeStyle = "#FFF8EE"; g.strokeText(label, 0, 0);
+    g.font = `${size}px ${FONT_DISP}`; g.textAlign = "center"; g.textBaseline = "middle"; g.lineJoin = "round";
+    g.strokeStyle = INK; g.lineWidth = Math.max(6, size * .36);
+    g.strokeText(label, 0, size * .07); g.strokeText(label, 0, 0);
+    g.strokeStyle = "#FFFFFF"; g.lineWidth = Math.max(3, size * .15); g.strokeText(label, 0, 0);
     g.fillStyle = color; g.fillText(label, 0, 0);
+    g.restore();
+  }
+
+  // ---------- 絵の 共通パーツ（太い線の まんが ふう） ----------
+  const INK = "#24170F";
+  // いまの パスを ぬって、くろい フチを かく
+  function ol(fill, lw) { if (fill) { g.fillStyle = fill; g.fill(); } g.lineWidth = lw; g.strokeStyle = INK; g.lineJoin = "round"; g.lineCap = "round"; g.stroke(); }
+  // かげ：clipFn の 形の中だけに shadeFn を ぬる
+  function shade(clipFn, shadeFn, color) { g.save(); g.beginPath(); clipFn(); g.clip(); g.fillStyle = color; g.beginPath(); shadeFn(); g.fill("evenodd"); g.restore(); }
+  // ドカン！の ギザギザ
+  function burst(x, y, r, fill, rot = 0, n = 9) {
+    g.save(); g.translate(x, y); g.rotate(rot); g.beginPath();
+    for (let i = 0; i < n * 2; i++) { const a = i * Math.PI / n, rr = i % 2 ? r * .58 : r * (i % 4 ? .9 : 1); i ? g.lineTo(Math.cos(a) * rr, Math.sin(a) * rr) : g.moveTo(rr, 0); }
+    g.closePath(); ol(fill, Math.max(3, r * .08)); g.restore();
+  }
+  // キラッ（4つの とがり）
+  function sparkle(x, y, r, fill = "#FFFFFF") {
+    if (r < .5) return;
+    g.beginPath();
+    for (let i = 0; i < 8; i++) { const a = i * Math.PI / 4 - Math.PI / 2, rr = i % 2 ? r * .3 : r; i ? g.lineTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr) : g.moveTo(x + Math.cos(a) * rr, y + Math.sin(a) * rr); }
+    g.closePath(); ol(fill, Math.max(1.5, r * .16));
+  }
+  // ほっぺ：ピンクの だえん ＋ ななめ線3本
+  function blush(x, y, rx, ry, lw, alpha = .55) {
+    g.fillStyle = `rgba(255,120,140,${alpha})`; g.beginPath(); g.ellipse(x, y, rx, ry, 0, 0, 7); g.fill();
+    g.strokeStyle = "rgba(200,60,80,.55)"; g.lineWidth = Math.max(1.2, lw * .45); g.lineCap = "round";
+    for (let i = -1; i <= 1; i++) { g.beginPath(); g.moveTo(x + i * rx * .45 + rx * .12, y - ry * .45); g.lineTo(x + i * rx * .45 - rx * .12, y + ry * .45); g.stroke(); }
+  }
+  // 集中線（まわりから まんなかへ）
+  function focusLines(cx, cy, rIn, alpha, now) {
+    const far = Math.hypot(cw, ch), seed = Math.floor(now * 8);
+    g.save(); g.fillStyle = `rgba(36,23,15,${alpha})`;
+    for (let i = 0; i < 44; i++) {
+      const j = Math.sin(i * 12.9898 + seed * 78.233) * 43758.5453, rnd = j - Math.floor(j);
+      const a = i * Math.PI * 2 / 44 + rnd * .08, w = .012 + rnd * .02, r0 = rIn * (1 + rnd * .35);
+      g.beginPath(); g.moveTo(cx + Math.cos(a) * r0, cy + Math.sin(a) * r0);
+      g.lineTo(cx + Math.cos(a - w) * far, cy + Math.sin(a - w) * far); g.lineTo(cx + Math.cos(a + w) * far, cy + Math.sin(a + w) * far); g.fill();
+    }
+    g.restore();
+  }
+  // 放射の はいけい
+  function rays(cx, cy, c1, c2, rot, n = 14) {
+    g.fillStyle = c1; g.fillRect(0, 0, cw, ch);
+    const far = Math.hypot(cw, ch); g.fillStyle = c2;
+    for (let i = 0; i < n; i++) { const a = rot + i * Math.PI * 2 / n; g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * far, cy + Math.sin(a) * far); g.lineTo(cx + Math.cos(a + Math.PI / n) * far, cy + Math.sin(a + Math.PI / n) * far); g.fill(); }
+  }
+  // いきおい線（うごく ものの うしろに）
+  function motionLines(x, y, vx, vy, r, alpha = .45) {
+    const v = Math.hypot(vx, vy); if (v < 1) return;
+    const ux = vx / v, uy = vy / v;
+    g.save(); g.strokeStyle = `rgba(36,23,15,${alpha})`; g.lineCap = "round"; g.lineWidth = Math.max(2, r * .12);
+    [-.55, 0, .55].forEach((o, i) => { const sx = x - ux * r * (1.3 + (i % 2) * .3) - uy * o * r, sy = y - uy * r * (1.3 + (i % 2) * .3) + ux * o * r; g.beginPath(); g.moveTo(sx, sy); g.lineTo(sx - ux * r * (1 + (i === 1) * .6), sy - uy * r * (1 + (i === 1) * .6)); g.stroke(); });
     g.restore();
   }
 
@@ -711,50 +766,97 @@ function songBgm(ev, t0, beat, nBars, style) {
       const A0 = -Math.PI * .82, A1 = -Math.PI * .18;
       const ang = (pos) => A0 + (A1 - A0) * (pos + .5) / 8;
       const pore = (pos) => { const a = ang(pos); return { x: cx + Math.cos(a) * R, y: cy + Math.sin(a) * R, a }; };
-      return { R, cx, cy, ang, pore, hl: R * .3, lw: Math.max(3, R * .03) };
+      return { R, cx, cy, ang, pore, hl: R * .3, lw: Math.max(4, R * .042) };
     }
-    function drawTiles() {
-      g.fillStyle = "#BFE9DF"; g.fillRect(0, 0, cw, ch);
-      const ts = Math.max(34, cw / 9);
-      g.strokeStyle = "#E6F7F2"; g.lineWidth = 3; g.beginPath();
-      for (let x = ts / 2; x < cw; x += ts) { g.moveTo(x, 0); g.lineTo(x, ch); }
-      for (let y = ts / 2; y < ch; y += ts) { g.moveTo(0, y); g.lineTo(cw, y); }
+    function drawRoom(now, hot) {
+      // ツルピカさんの うしろから ひかりの すじ（ゆっくり まわる）
+      rays(G.cx, G.cy - G.R * .25, hot ? "#9FDCCB" : "#A9E3D4", hot ? "#C4F0E3" : "#BDEBDF", now * .06);
+      // 下のほうに タイルの かべ
+      const wy = G.cy - G.R * .15, ts = Math.max(34, cw / 8);
+      g.fillStyle = "#8FD3C1"; g.fillRect(0, wy, cw, ch - wy);
+      g.strokeStyle = "rgba(36,23,15,.22)"; g.lineWidth = 2; g.beginPath();
+      for (let x = (cw / 2) % ts; x < cw; x += ts) { g.moveTo(x, wy); g.lineTo(x, ch); }
+      for (let y = wy + ts * .6; y < ch; y += ts * .6) { g.moveTo(0, y); g.lineTo(cw, y); }
       g.stroke();
+      g.fillStyle = "#FFF8EE"; g.fillRect(0, wy - 8, cw, 8);
+      g.strokeStyle = INK; g.lineWidth = 3; g.beginPath(); g.moveTo(0, wy - 8); g.lineTo(cw, wy - 8); g.moveTo(0, wy); g.lineTo(cw, wy); g.stroke();
     }
     function drawHead(now, mood) {
-      const { R, cx, cy } = G;
-      g.fillStyle = "#FFC49E"; g.strokeStyle = "#3A2413"; g.lineWidth = G.lw;
-      [-1, 1].forEach((s) => { g.beginPath(); g.ellipse(cx + s * R * .98, cy + R * .1, R * .13, R * .19, 0, 0, 7); g.fill(); g.stroke(); });
-      const gr = g.createRadialGradient(cx - R * .3, cy - R * .55, R * .05, cx, cy, R);
-      gr.addColorStop(0, "#FFE6D3"); gr.addColorStop(1, "#FFCBA6");
-      g.fillStyle = gr; g.beginPath(); g.arc(cx, cy, R, 0, Math.PI * 2); g.fill(); g.stroke();
-      g.fillStyle = "rgba(255,255,255,.75)"; g.beginPath(); g.ellipse(cx - R * .35, cy - R * .68, R * .16, R * .07, -.5, 0, 7); g.fill();
-      g.fillStyle = "rgba(160,90,60,.35)";
-      for (let p = 0; p < 8; p++) { const o = G.pore(p); g.beginPath(); g.arc(o.x - Math.cos(o.a) * 3, o.y - Math.sin(o.a) * 3, Math.max(2, R * .018), 0, 7); g.fill(); }
-      const ey = cy - R * .02, ex = R * .3;
-      g.strokeStyle = "#3A2413"; g.fillStyle = "#3A2413"; g.lineWidth = G.lw * 1.1; g.lineCap = "round";
+      const { R, cx, cy, lw } = G, SK = "#FFD6B3", SH = "#F2AC84";
+      // みみ
+      [-1, 1].forEach((s) => {
+        const x = cx + s * R * .98, y = cy + R * .12;
+        g.beginPath(); g.ellipse(x, y, R * .14, R * .2, 0, 0, 7); ol(SK, lw);
+        g.beginPath(); g.arc(x + s * R * .01, y, R * .075, s > 0 ? -Math.PI * .45 : Math.PI * .55, s > 0 ? Math.PI * .45 : Math.PI * 1.45); g.lineWidth = lw * .7; g.stroke();
+      });
+      // あたま（ベタぬり ＋ 右下に かげ）
+      g.beginPath(); g.arc(cx, cy, R, 0, 7); g.fillStyle = SK; g.fill();
+      shade(() => g.arc(cx, cy, R, 0, 7), () => { g.rect(cx - R, cy - R, R * 2, R * 2); g.moveTo(cx + R * .87, cy - R * .12); g.arc(cx - R * .1, cy - R * .12, R * .97, 0, 7); }, SH);
+      g.beginPath(); g.arc(cx, cy, R, 0, 7); ol(null, lw * 1.15);
+      // ツルピカの ツヤ
+      g.save(); g.translate(cx - R * .4, cy - R * .64); g.rotate(-.6);
+      g.fillStyle = "#FFFFFF"; g.beginPath(); g.ellipse(0, 0, R * .22, R * .075, 0, 0, 7); g.fill(); g.restore();
+      g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(cx - R * .1, cy - R * .8, R * .035, 0, 7); g.fill();
+      const tw = now % 2.6; if (tw < .4) sparkle(cx - R * .62, cy - R * .78, R * .11 * Math.sin(Math.PI * tw / .4));
+      // けあな
+      g.fillStyle = "rgba(150,80,50,.45)";
+      for (let p = 0; p < 8; p++) { const o = G.pore(p); g.beginPath(); g.arc(o.x - Math.cos(o.a) * 4, o.y - Math.sin(o.a) * 4, Math.max(2, R * .018), 0, 7); g.fill(); }
+      const ey = cy - R * .02, ex = R * .3, by = ey - R * .19;
+      g.strokeStyle = INK; g.fillStyle = INK; g.lineCap = "round"; g.lineJoin = "round";
+      // まゆげ（きもちで うごく）
+      g.lineWidth = lw * 1.7;
+      [-1, 1].forEach((s) => {
+        const x = cx + s * ex; g.beginPath();
+        if (mood === "strain") { g.moveTo(x - s * R * .11, by - R * .05); g.lineTo(x + s * R * .09, by + R * .03); }
+        else if (mood === "ouch") { g.moveTo(x - s * R * .11, by + R * .03); g.lineTo(x + s * R * .09, by - R * .06); }
+        else if (mood === "smug") { const up = s > 0 ? -R * .05 : 0; g.moveTo(x - R * .1, by + up + R * .02); g.quadraticCurveTo(x, by + up - R * .05, x + R * .1, by + up + R * .01); }
+        else { const bb = Math.sin(now * 2.2) * R * .008; g.moveTo(x - R * .1, by + R * .02 + bb); g.quadraticCurveTo(x, by - R * .04 + bb, x + R * .1, by + R * .02 + bb); }
+        g.stroke();
+      });
+      // め
+      g.lineWidth = lw * 1.2;
       const blink = (now % 3.3) < .12;
-      if (mood === "ouch" || mood === "strain") [-1, 1].forEach((s) => { g.beginPath(); g.moveTo(cx + s * ex - R * .07, ey - R * .05); g.lineTo(cx + s * ex + s * R * .02, ey); g.lineTo(cx + s * ex - R * .07, ey + R * .05); g.stroke(); });
-      else if (mood === "smug") [-1, 1].forEach((s) => { g.beginPath(); g.arc(cx + s * ex, ey + R * .03, R * .07, Math.PI * 1.15, Math.PI * 1.85); g.stroke(); });
-      else if (blink) [-1, 1].forEach((s) => { g.beginPath(); g.moveTo(cx + s * ex - R * .06, ey); g.lineTo(cx + s * ex + R * .06, ey); g.stroke(); });
-      else [-1, 1].forEach((s) => { g.beginPath(); g.arc(cx + s * ex, ey, R * .055, 0, 7); g.fill(); });
-      g.fillStyle = mood === "ouch" ? "rgba(255,110,110,.75)" : "rgba(255,150,150,.5)";
-      [-1, 1].forEach((s) => { g.beginPath(); g.ellipse(cx + s * R * .5, cy + R * .18, R * .11, R * .07, 0, 0, 7); g.fill(); });
-      g.fillStyle = "#FFB48A"; g.lineWidth = G.lw;
-      g.beginPath(); g.ellipse(cx, cy + R * .14, R * .1, R * .08, 0, 0, 7); g.fill(); g.stroke();
-      g.lineWidth = G.lw * 1.1; g.fillStyle = "#8C2F2F";
-      const my = cy + R * .34;
-      if (mood === "ouch") { g.beginPath(); g.ellipse(cx, my, R * .07, R * .09, 0, 0, 7); g.fill(); g.stroke(); }
-      else if (mood === "strain") { g.beginPath(); for (let i = 0; i <= 6; i++) { const x = cx - R * .14 + i * R * .047, y = my + (i % 2 ? -1 : 1) * R * .025; i ? g.lineTo(x, y) : g.moveTo(x, y); } g.stroke(); }
-      else if (mood === "smug") { g.beginPath(); g.moveTo(cx - R * .12, my); g.quadraticCurveTo(cx + R * .02, my + R * .08, cx + R * .15, my - R * .04); g.stroke(); }
-      else { g.beginPath(); g.arc(cx, my - R * .06, R * .12, Math.PI * .2, Math.PI * .8); g.stroke(); }
+      if (mood === "ouch" || mood === "strain") [-1, 1].forEach((s) => { g.beginPath(); g.moveTo(cx + s * ex - s * R * .07, ey - R * .06); g.lineTo(cx + s * ex + s * R * .03, ey); g.lineTo(cx + s * ex - s * R * .07, ey + R * .06); g.stroke(); });
+      else if (mood === "smug") [-1, 1].forEach((s) => { g.beginPath(); g.arc(cx + s * ex, ey + R * .04, R * .075, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); });
+      else if (blink) [-1, 1].forEach((s) => { g.beginPath(); g.moveTo(cx + s * ex - R * .07, ey); g.lineTo(cx + s * ex + R * .07, ey); g.stroke(); });
+      else [-1, 1].forEach((s) => {
+        g.fillStyle = INK; g.beginPath(); g.ellipse(cx + s * ex, ey, R * .062, R * .085, 0, 0, 7); g.fill();
+        g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(cx + s * ex - R * .02, ey - R * .035, R * .024, 0, 7); g.fill();
+      });
+      // ほっぺ
+      [-1, 1].forEach((s) => blush(cx + s * R * .52, cy + R * .2, R * .12, R * .07, lw, mood === "ouch" ? .85 : .5));
+      // はな
+      g.beginPath(); g.ellipse(cx, cy + R * .14, R * .11, R * .085, 0, 0, 7); ol("#FFB38A", lw);
+      g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(cx - R * .04, cy + R * .11, R * .022, 0, 7); g.fill();
+      // くち
+      const my = cy + R * .36; g.lineWidth = lw * 1.1;
+      if (mood === "ouch") {
+        g.beginPath(); g.ellipse(cx, my + R * .02, R * .085, R * .11, 0, 0, 7); ol("#9C2F35", lw);
+        g.fillStyle = "#FF8A8A"; g.beginPath(); g.ellipse(cx, my + R * .08, R * .05, R * .035, 0, 0, 7); g.fill();
+      } else if (mood === "strain") {
+        g.beginPath(); g.rect(cx - R * .15, my - R * .04, R * .3, R * .09); ol("#FFFFFF", lw);
+        g.lineWidth = lw * .6; g.beginPath(); g.moveTo(cx - R * .15, my + R * .005); g.lineTo(cx + R * .15, my + R * .005);
+        for (let i = 1; i < 4; i++) { g.moveTo(cx - R * .15 + i * R * .075, my - R * .04); g.lineTo(cx - R * .15 + i * R * .075, my + R * .05); } g.stroke();
+      } else if (mood === "smug") { g.beginPath(); g.moveTo(cx - R * .13, my); g.quadraticCurveTo(cx + R * .02, my + R * .09, cx + R * .16, my - R * .05); g.stroke(); }
+      else {
+        g.beginPath(); g.moveTo(cx - R * .14, my - R * .03); g.quadraticCurveTo(cx, my + R * .17, cx + R * .14, my - R * .03); g.closePath(); ol("#9C2F35", lw);
+        g.save(); g.clip(); g.fillStyle = "#FF8A8A"; g.beginPath(); g.ellipse(cx, my + R * .1, R * .08, R * .05, 0, 0, 7); g.fill(); g.restore();
+      }
+      // ひげ（はなの した）
+      g.fillStyle = "#3A2A22";
+      [-1, 1].forEach((s) => { g.beginPath(); g.moveTo(cx, my - R * .1); g.quadraticCurveTo(cx + s * R * .12, my - R * .16, cx + s * R * .22, my - R * .06); g.quadraticCurveTo(cx + s * R * .12, my - R * .07, cx, my - R * .05); g.closePath(); ol("#3A2A22", lw * .7); });
+      // あせ（ひっぱられてる とき）
+      if (mood === "strain") [-1, 1].forEach((s, i) => {
+        const k = (now * 2.2 + i * .5) % 1, x = cx + s * R * .72, y = cy - R * .45 + k * R * .25;
+        g.globalAlpha = 1 - k * .6; g.beginPath(); g.moveTo(x, y - R * .09); g.quadraticCurveTo(x + R * .06, y, x, y + R * .03); g.quadraticCurveTo(x - R * .06, y, x, y - R * .09); ol("#8FD8FF", lw * .6); g.globalAlpha = 1;
+      });
     }
     function drawHair(o, n, grow, opts = {}) {
       const len = G.hl * grow * (opts.stretch || 1); if (len < 1) return;
       const a = o.a, dx = Math.cos(a), dy = Math.sin(a), nx = -dy, ny = dx, b = (n.bend || 0) * len * .35;
       const tipx = o.x + dx * len + nx * b * .6, tipy = o.y + dy * len + ny * b * .6;
-      g.strokeStyle = opts.missed ? "#6B5A50" : "#2A1A12"; g.lineCap = "round"; g.lineJoin = "round";
-      g.lineWidth = G.lw * (n.len ? 1.25 : 1);
+      g.strokeStyle = opts.missed ? "#7A6A60" : INK; g.lineCap = "round"; g.lineJoin = "round";
+      g.lineWidth = G.lw * (n.len ? 1.15 : .95);
       g.beginPath(); g.moveTo(o.x, o.y); g.quadraticCurveTo(o.x + dx * len * .5 + nx * b, o.y + dy * len * .5 + ny * b, tipx, tipy); g.stroke();
       if (n.len) {
         const r = G.hl * .16 * grow, base = Math.atan2(dy, dx) + Math.PI;
@@ -773,17 +875,25 @@ function songBgm(ev, t0, beat, nBars, style) {
       g.lineCap = "round"; g.lineJoin = "round";
       [-1, 1].forEach((s) => {
         g.beginPath(); g.moveTo(s * w * .15, 0); g.lineTo(s * w, -L * .55); g.lineTo(s * size * .12, -L);
-        g.strokeStyle = "#3A2413"; g.lineWidth = size * .12; g.stroke();
-        g.strokeStyle = "#C9D3DB"; g.lineWidth = size * .07; g.stroke();
+        g.strokeStyle = INK; g.lineWidth = size * .15; g.stroke();
+        g.strokeStyle = "#B8C4CE"; g.lineWidth = size * .08; g.stroke();
+        g.beginPath(); g.moveTo(s * w * .15 - s * size * .015, -L * .05); g.lineTo(s * w - s * size * .015, -L * .55);
+        g.strokeStyle = "#FFFFFF"; g.lineWidth = size * .025; g.stroke();
       });
+      // にぎる ところの ギザギザ
+      g.strokeStyle = INK; g.lineWidth = size * .025;
+      for (let k = 0; k < 3; k++) { const yy = -L * (.4 + k * .07), ww = w * (.72 + k * .12); g.beginPath(); g.moveTo(-ww, yy); g.lineTo(-ww * .78, yy); g.moveTo(ww, yy); g.lineTo(ww * .78, yy); g.stroke(); }
       g.restore();
     }
 
     function draw(now) {
-      drawTiles();
       let bob = Math.sin(now * 2) * 2;
       if (chart && playing && now > chart.t0) bob = -Math.abs(Math.sin(Math.PI * ((now - chart.t0) / chart.beat))) * 4;
       G = geo(bob);
+      const ri0 = chart ? curRound(now) : -1, r0 = ri0 >= 0 ? chart.rounds[ri0] : null;
+      const resp = !!(r0 && playing && now >= r0.respStart && now < r0.respStart + chart.bar);
+      drawRoom(now, resp);
+      if (resp) focusLines(G.cx, G.cy - G.R * .3, G.R * 1.55, .09, now); // ぬく 番：まわりに 集中線
       if (!chart) {
         drawHead(now, "normal");
         [1, 3, 4, 6].forEach((p, i) => drawHair(G.pore(p), { len: i === 2 ? 2 : 0, bend: [.3, -.2, 0, .25][i], spin: 1 }, 1));
@@ -824,7 +934,11 @@ function songBgm(ev, t0, beat, nBars, style) {
         if (t < .25 && !S.guide) drawTweezers(dx * G.hl * .9, dy * G.hl * .9, o.a + Math.PI, G.R * .32, 1);
         g.restore();
         if (t < .5) { g.fillStyle = `rgba(255,90,90,${.7 * (1 - t / .5)})`; g.beginPath(); g.arc(o.x, o.y, G.R * .035, 0, 7); g.fill(); }
-        if (t < .3) { g.globalAlpha = 1 - t / .3; bigText("プチッ", o.x + dx * G.hl * .6, o.y + dy * G.hl * .6 - t * 20, Math.max(12, G.R * .09), "#3A2413"); g.globalAlpha = 1; }
+        if (t < .3) {
+          const px = o.x + dx * G.hl * .6, py = o.y + dy * G.hl * .6 - t * 20, k = 1 - t / .3;
+          g.globalAlpha = k; burst(px, py, G.R * .16 * (1.3 - k * .3), n.grade === "bacchiri" ? "#FFE14D" : "#FFF3C4", n.spin * .3);
+          bigText("プチッ", px, py, Math.max(12, G.R * .09), INK); g.globalAlpha = 1;
+        }
       }
       // せーの
       if (cur && chart.gapBeats && now >= cur.gapStart && now < cur.respStart) {
@@ -944,109 +1058,165 @@ function songBgm(ev, t0, beat, nBars, style) {
       const s = Math.min(cw * .42, ch * .5), floorY = ch * .86, catX = cw * .68;
       return { s, floorY, catX, hx: catX - s * .64, hy: floorY - s * .56, sx: -s * .3, sy: floorY - s * .6 };
     }
-    function drawDojo() {
-      const { floorY, s } = L;
-      g.fillStyle = "#F4E6C8"; g.fillRect(0, 0, cw, floorY);
-      g.fillStyle = "#E9D6AE";
-      for (let x = 0; x < cw; x += Math.max(60, cw / 5)) g.fillRect(x, 0, 3, floorY);
-      g.fillStyle = "#9C6B3C"; g.fillRect(0, floorY - s * 1.9, cw, 10); g.fillRect(0, floorY - 14, cw, 14);
+    function drawDojo(now) {
+      const { floorY, s } = L, beamY = Math.max(24, floorY - s * 1.9);
+      // らんま（うえの こうし）
+      g.fillStyle = "#E4CD9C"; g.fillRect(0, 0, cw, beamY);
+      g.strokeStyle = "rgba(36,23,15,.28)"; g.lineWidth = 3; g.beginPath();
+      for (let x = 8; x < cw; x += 16) { g.moveTo(x, 0); g.lineTo(x, beamY); }
+      g.stroke();
+      // かべ
+      g.fillStyle = "#F6E8C8"; g.fillRect(0, beamY, cw, floorY - beamY);
+      // はしら
+      const pw = Math.max(16, s * .12);
+      [cw * .03, cw * .97].forEach((x) => { g.beginPath(); g.rect(x - pw / 2, beamY, pw, floorY - beamY); ol("#B07A45", 3); g.fillStyle = "#95632F"; g.fillRect(x + pw * .15, beamY + 2, pw * .3, floorY - beamY - 4); });
+      // なげし（よこの 木）
+      g.beginPath(); g.rect(-4, beamY - 7, cw + 8, 14); ol("#B07A45", 3);
+      g.beginPath(); g.rect(-4, floorY - 16, cw + 8, 16); ol("#9C6B3C", 3);
       // かけじく
-      const kx = cw * .22, kw = Math.min(70, cw * .15), ky = Math.max(10, floorY - s * 1.8);
-      g.fillStyle = "#FFFDF6"; g.strokeStyle = "#3A2413"; g.lineWidth = 3;
-      g.fillRect(kx - kw / 2, ky, kw, kw * 2); g.strokeRect(kx - kw / 2, ky, kw, kw * 2);
-      g.fillStyle = "#3A2413"; g.fillRect(kx - kw / 2 - 6, ky - 6, kw + 12, 8); g.fillRect(kx - kw / 2 - 6, ky + kw * 2, kw + 12, 8);
-      g.font = `${kw * .55}px ${FONT_DISP}`; g.textAlign = "center"; g.textBaseline = "middle";
-      g.fillText("気", kx, ky + kw * .6); g.fillText("合", kx, ky + kw * 1.35);
+      const kx = cw * .22, kw = Math.min(70, cw * .15), ky = beamY + 18;
+      g.beginPath(); g.moveTo(kx, beamY + 2); g.lineTo(kx - kw * .35, ky - 4); g.moveTo(kx, beamY + 2); g.lineTo(kx + kw * .35, ky - 4); g.lineWidth = 2.5; g.strokeStyle = INK; g.stroke();
+      g.beginPath(); g.rect(kx - kw / 2 - 5, ky - 4, kw + 10, kw * 2 + 8); ol("#3E6B4A", 3.5);
+      g.beginPath(); g.rect(kx - kw / 2, ky, kw, kw * 2); ol("#FFFDF6", 3);
+      [ky - 6, ky + kw * 2 + 2].forEach((y) => { g.beginPath(); g.rect(kx - kw / 2 - 9, y, kw + 18, 8); ol("#5A3A20", 3); });
+      g.fillStyle = INK; g.font = `${kw * .55}px ${FONT_DISP}`; g.textAlign = "center"; g.textBaseline = "middle";
+      g.fillText("気", kx, ky + kw * .58); g.fillText("合", kx, ky + kw * 1.36);
+      g.fillStyle = "#E0463C"; g.fillRect(kx + kw * .12, ky + kw * 1.72, kw * .2, kw * .2);
       // たたみ
-      g.fillStyle = "#C9B56A"; g.fillRect(0, floorY, cw, ch - floorY);
-      g.strokeStyle = "#8C7A3A"; g.lineWidth = 3;
-      for (let x = -40; x < cw; x += Math.max(90, cw / 3)) { g.beginPath(); g.moveTo(x, floorY); g.lineTo(x + 30, ch); g.stroke(); }
-      g.fillStyle = "#3A5A3A"; g.fillRect(0, floorY, cw, 6);
+      g.fillStyle = "#D6C67E"; g.fillRect(0, floorY, cw, ch - floorY);
+      g.strokeStyle = "rgba(120,100,40,.35)"; g.lineWidth = 1.5; g.beginPath();
+      for (let y = floorY + 12; y < ch; y += 7) { g.moveTo(0, y); g.lineTo(cw, y); }
+      g.stroke();
+      const tw = Math.max(120, cw / 2.2);
+      for (let x = -tw * .3; x < cw + tw; x += tw) { g.beginPath(); g.moveTo(x, floorY); g.lineTo(x + 26, ch); g.lineWidth = 9; g.strokeStyle = "#2F4A35"; g.stroke(); g.lineWidth = 2.5; g.strokeStyle = INK; g.stroke(); }
+      g.beginPath(); g.rect(-4, floorY, cw + 8, 9); ol("#2F4A35", 3);
     }
     function drawCat(now, pose) {
-      const { s, floorY, catX: x } = L, lw = Math.max(2.5, s * .022);
+      const { s, floorY, catX: x } = L, lw = Math.max(3.5, s * .03);
       const bob = chart && playing ? Math.abs(Math.sin(Math.PI * ((now - chart.t0) / chart.beat))) * s * .025 : Math.abs(Math.sin(now * 2.5)) * s * .015;
-      const INK = "#3A2413", FUR = "#FFFDF7", GI = "#FFFFFF", PAD = "#FFB3C6";
+      const FUR = "#FFFDF7", FUR_SH = "#E9DFD2", GI = "#FFFFFF", GI_SH = "#D7E1EA", PAD = "#FFB3C6", ORG = "#F2A541";
       g.lineJoin = "round"; g.lineCap = "round"; g.strokeStyle = INK; g.lineWidth = lw;
-      // しっぽ
-      g.lineWidth = s * .07; g.strokeStyle = INK; g.beginPath(); g.moveTo(x + s * .2, floorY - s * .22); g.quadraticCurveTo(x + s * .5, floorY - s * .3, x + s * .42, floorY - s * .6 + Math.sin(now * 4) * s * .04); g.stroke();
-      g.lineWidth = s * .045; g.strokeStyle = "#F2A541"; g.stroke(); g.strokeStyle = INK; g.lineWidth = lw;
+      // かげ
+      g.fillStyle = "rgba(36,23,15,.2)"; g.beginPath(); g.ellipse(x, floorY + 2, s * .48, s * .07, 0, 0, 7); g.fill();
+      // しっぽ（しましま）
+      const tailTip = [x + s * .42, floorY - s * .6 + Math.sin(now * 4) * s * .04];
+      g.beginPath(); g.moveTo(x + s * .2, floorY - s * .22); g.quadraticCurveTo(x + s * .52, floorY - s * .3, tailTip[0], tailTip[1]);
+      g.lineWidth = s * .075 + lw * 2; g.strokeStyle = INK; g.stroke(); g.lineWidth = s * .075; g.strokeStyle = ORG; g.stroke();
+      g.setLineDash([s * .035, s * .05]); g.strokeStyle = "#C97A1E"; g.lineWidth = s * .075; g.stroke(); g.setLineDash([]);
+      g.strokeStyle = INK; g.lineWidth = lw;
       const limb = (pts, w, col) => { g.lineWidth = w + lw * 2; g.strokeStyle = INK; g.beginPath(); pts.forEach(([px, py], i) => i ? g.lineTo(px, py) : g.moveTo(px, py)); g.stroke(); g.lineWidth = w; g.strokeStyle = col; g.stroke(); g.strokeStyle = INK; g.lineWidth = lw; };
-      const paw = (px, py, r) => { g.fillStyle = FUR; g.beginPath(); g.arc(px, py, r, 0, 7); g.fill(); g.stroke(); g.fillStyle = PAD; g.beginPath(); g.arc(px - r * .3, py + r * .1, r * .3, 0, 7); g.fill(); };
+      const paw = (px, py, r) => { g.beginPath(); g.arc(px, py, r, 0, 7); ol(FUR, lw); g.fillStyle = PAD; g.beginPath(); g.arc(px - r * .3, py + r * .1, r * .3, 0, 7); g.fill(); };
       const top = floorY - s * .62 + bob, bot = floorY - s * .2 + bob * .5;
       // あし：まえに ふみだした かまえ（まえ足は まげて、うしろ足は のばす）
-      limb([[x - s * .08, bot], [x - s * .24, floorY - s * .14], [x - s * .3, floorY - s * .04]], s * .12, GI);
-      limb([[x + s * .08, bot], [x + s * .22, floorY - s * .1], [x + s * .3, floorY - s * .04]], s * .12, GI);
-      g.fillStyle = FUR; [[x - s * .33, floorY - s * .02], [x + s * .33, floorY - s * .02]].forEach(([fx0, fy0]) => { g.beginPath(); g.ellipse(fx0, fy0, s * .075, s * .035, 0, 0, 7); g.fill(); g.stroke(); });
+      limb([[x - s * .08, bot], [x - s * .24, floorY - s * .14], [x - s * .3, floorY - s * .04]], s * .13, GI);
+      limb([[x + s * .08, bot], [x + s * .22, floorY - s * .1], [x + s * .3, floorY - s * .04]], s * .13, GI_SH);
+      [[x - s * .33, floorY - s * .02], [x + s * .33, floorY - s * .02]].forEach(([fx0, fy0]) => { g.beginPath(); g.ellipse(fx0, fy0, s * .08, s * .038, 0, 0, 7); ol(FUR, lw); });
       // どうぎ
-      g.fillStyle = GI; g.beginPath();
-      g.moveTo(x - s * .19, top); g.quadraticCurveTo(x, top - s * .04, x + s * .19, top); g.lineTo(x + s * .22, bot); g.quadraticCurveTo(x, bot + s * .04, x - s * .22, bot); g.closePath(); g.fill(); g.stroke();
+      const gi = () => { g.moveTo(x - s * .19, top); g.quadraticCurveTo(x, top - s * .04, x + s * .19, top); g.lineTo(x + s * .22, bot); g.quadraticCurveTo(x, bot + s * .04, x - s * .22, bot); g.closePath(); };
+      g.beginPath(); gi(); g.fillStyle = GI; g.fill();
+      shade(gi, () => g.rect(x + s * .06, top - s * .1, s * .3, s * .6), GI_SH);
+      g.beginPath(); gi(); ol(null, lw);
       g.beginPath(); g.moveTo(x - s * .1, top + s * .01); g.lineTo(x + s * .02, top + s * .2); g.lineTo(x + s * .1, top + s * .01); g.stroke();
-      g.fillStyle = "#2A1A12"; g.fillRect(x - s * .22, bot - s * .1, s * .44, s * .055);
-      g.beginPath(); g.moveTo(x + s * .03, bot - s * .07); g.lineTo(x - s * .02, bot + s * .06); g.lineTo(x + s * .05, bot + s * .05); g.closePath(); g.fill();
+      // くろおび
+      g.beginPath(); g.rect(x - s * .225, bot - s * .11, s * .45, s * .065); ol("#1C1410", lw * .8);
+      g.fillStyle = "#1C1410"; g.beginPath(); g.moveTo(x + s * .02, bot - s * .07); g.lineTo(x - s * .05, bot + s * .08); g.lineTo(x + s * .02, bot + s * .07); g.lineTo(x + s * .03, bot - s * .02); g.lineTo(x + s * .09, bot + s * .07); g.lineTo(x + s * .12, bot + s * .05); g.closePath(); ol("#1C1410", lw * .8);
       // うしろの手：こしに ひいた「ひきて」
-      limb([[x + s * .14, top + s * .08], [x + s * .26, top + s * .24], [x + s * .17, bot - s * .1]], s * .09, GI);
-      paw(x + s * .15, bot - s * .1, s * .06);
+      limb([[x + s * .14, top + s * .08], [x + s * .26, top + s * .24], [x + s * .17, bot - s * .1]], s * .1, GI_SH);
+      paw(x + s * .15, bot - s * .1, s * .065);
       // まえの手：かまえ（ひじを まげて こぶしを まえに）→ パンチで まっすぐ のばす
       const punching = pose === "punch";
       if (punching) {
-        limb([[x - s * .12, top + s * .08], [L.hx + s * .05, L.hy]], s * .095, GI);
-        paw(L.hx + s * .02, L.hy, s * .085);
-        g.lineWidth = 3; [-.12, 0, .12].forEach((d) => { g.beginPath(); g.moveTo(L.hx + s * .14, L.hy + d * s); g.lineTo(L.hx + s * .3, L.hy + d * s * 1.3); g.stroke(); }); g.lineWidth = lw;
+        g.save(); g.strokeStyle = "rgba(36,23,15,.45)"; g.lineWidth = Math.max(2, lw * .7);
+        [-.1, -.03, .04, .1].forEach((d, i) => { g.beginPath(); g.moveTo(x - s * (.2 + (i % 2) * .06), top + s * (.08 + d)); g.lineTo(L.hx + s * .25, L.hy + d * s * .6); g.stroke(); });
+        g.restore();
+        limb([[x - s * .12, top + s * .08], [L.hx + s * .05, L.hy]], s * .1, GI);
+        burst(L.hx - s * .04, L.hy, s * .12, "#FFE14D", now * 3, 8);
+        paw(L.hx + s * .02, L.hy, s * .09);
       } else {
-        limb([[x - s * .12, top + s * .08], [x - s * .2, top + s * .3], [x - s * .34, top + s * .14]], s * .095, GI);
-        paw(x - s * .35, top + s * .13, s * .07);
+        limb([[x - s * .12, top + s * .08], [x - s * .2, top + s * .3], [x - s * .34, top + s * .14]], s * .1, GI);
+        paw(x - s * .35, top + s * .13, s * .075);
       }
       // あたま（おおきく まるく）
       const R = s * .36, hx = x - s * .02, hy = floorY - s * .92 + bob;
       [-1, 1].forEach((d) => {
-        g.fillStyle = d > 0 ? "#F2A541" : FUR;
-        g.beginPath(); g.moveTo(hx + d * R * .95, hy - R * .25); g.quadraticCurveTo(hx + d * R * 1.02, hy - R * 1.2, hx + d * R * .78, hy - R * 1.18); g.quadraticCurveTo(hx + d * R * .5, hy - R * 1.05, hx + d * R * .25, hy - R * .78); g.closePath(); g.fill(); g.stroke();
+        g.beginPath(); g.moveTo(hx + d * R * .95, hy - R * .25); g.quadraticCurveTo(hx + d * R * 1.02, hy - R * 1.2, hx + d * R * .78, hy - R * 1.18); g.quadraticCurveTo(hx + d * R * .5, hy - R * 1.05, hx + d * R * .25, hy - R * .78); g.closePath(); ol(d > 0 ? ORG : FUR, lw);
         g.fillStyle = PAD; g.beginPath(); g.moveTo(hx + d * R * .8, hy - R * .5); g.quadraticCurveTo(hx + d * R * .85, hy - R * 1.0, hx + d * R * .72, hy - R * .98); g.quadraticCurveTo(hx + d * R * .52, hy - R * .88, hx + d * R * .4, hy - R * .72); g.closePath(); g.fill();
       });
-      g.fillStyle = FUR; g.beginPath(); g.ellipse(hx, hy, R * 1.1, R * .92, 0, 0, 7); g.fill(); g.stroke();
-      g.save(); g.beginPath(); g.ellipse(hx, hy, R * 1.1, R * .92, 0, 0, 7); g.clip();
-      g.fillStyle = "#F2A541"; g.beginPath(); g.ellipse(hx + R * .7, hy - R * .55, R * .5, R * .38, .4, 0, 7); g.fill(); g.restore();
-      g.beginPath(); g.ellipse(hx, hy, R * 1.1, R * .92, 0, 0, 7); g.stroke();
+      const head = () => g.ellipse(hx, hy, R * 1.1, R * .92, 0, 0, 7);
+      g.beginPath(); head(); g.fillStyle = FUR; g.fill();
+      g.save(); g.beginPath(); head(); g.clip();
+      g.fillStyle = ORG; g.beginPath(); g.ellipse(hx + R * .7, hy - R * .55, R * .5, R * .38, .4, 0, 7); g.fill();
+      g.fillStyle = FUR_SH; g.beginPath(); g.rect(hx - R * 1.2, hy - R, R * 2.4, R * 2); g.moveTo(hx - R * .06 + R * 1.1, hy - R * .1); g.ellipse(hx - R * .06, hy - R * .1, R * 1.1, R * .92, 0, 0, 7); g.fill("evenodd");
       // はちまき
-      g.fillStyle = "#E0463C"; g.save(); g.beginPath(); g.ellipse(hx, hy, R * 1.1, R * .92, 0, 0, 7); g.clip(); g.fillRect(hx - R * 1.2, hy - R * .62, R * 2.4, R * .2); g.restore();
+      g.fillStyle = "#E0463C"; g.fillRect(hx - R * 1.2, hy - R * .64, R * 2.4, R * .22);
+      g.strokeStyle = INK; g.lineWidth = lw * .8; g.beginPath(); g.moveTo(hx - R * 1.2, hy - R * .64); g.lineTo(hx + R * 1.2, hy - R * .64); g.moveTo(hx - R * 1.2, hy - R * .42); g.lineTo(hx + R * 1.2, hy - R * .42); g.stroke();
+      g.restore();
+      g.beginPath(); head(); ol(null, lw * 1.1);
       const wave = Math.sin(now * 12) * R * .1;
-      g.beginPath(); g.moveTo(hx + R * 1.0, hy - R * .55); g.quadraticCurveTo(hx + R * 1.4, hy - R * .8 + wave, hx + R * 1.7, hy - R * .5 - wave); g.lineTo(hx + R * 1.65, hy - R * .36 - wave); g.quadraticCurveTo(hx + R * 1.35, hy - R * .55 + wave, hx + R * 1.0, hy - R * .42); g.fill();
+      g.beginPath(); g.moveTo(hx + R * 1.0, hy - R * .58); g.quadraticCurveTo(hx + R * 1.4, hy - R * .82 + wave, hx + R * 1.75, hy - R * .52 - wave); g.lineTo(hx + R * 1.68, hy - R * .34 - wave); g.quadraticCurveTo(hx + R * 1.35, hy - R * .55 + wave, hx + R * 1.02, hy - R * .42); g.closePath(); ol("#E0463C", lw * .8);
+      // まゆげ（きりっと）
+      const ey = hy + R * .04, exs = [hx - R * .48, hx + R * .28];
+      g.strokeStyle = INK; g.lineWidth = lw * 1.5;
+      exs.forEach((ex, i) => { const d = i ? -1 : 1, by = ey - R * .3; g.beginPath();
+        if (pose === "ouch") { g.moveTo(ex - d * R * .14, by + R * .02); g.lineTo(ex + d * R * .1, by - R * .06); }
+        else { g.moveTo(ex - d * R * .14, by - R * .06); g.lineTo(ex + d * R * .1, by + R * .03); }
+        g.stroke(); });
       // め
-      const ey = hy + R * .02, exs = [hx - R * .48, hx + R * .28];
-      g.fillStyle = INK; g.strokeStyle = INK;
+      g.fillStyle = INK;
       exs.forEach((ex, i) => {
         if (pose === "ouch") { g.lineWidth = lw; g.beginPath(); for (let k = 0; k <= 20; k++) { const a = k * .6, r = R * .01 * k * .7; k ? g.lineTo(ex + Math.cos(a) * r, ey + Math.sin(a) * r) : g.moveTo(ex, ey); } g.stroke(); }
-        else if (punching) { g.lineWidth = lw * 1.3; const d = i ? -1 : 1; g.beginPath(); g.moveTo(ex - d * R * .1, ey - R * .08); g.lineTo(ex + d * R * .06, ey); g.lineTo(ex - d * R * .1, ey + R * .08); g.stroke(); }
+        else if (punching) { g.lineWidth = lw * 1.4; const d = i ? -1 : 1; g.beginPath(); g.moveTo(ex - d * R * .1, ey - R * .09); g.lineTo(ex + d * R * .07, ey); g.lineTo(ex - d * R * .1, ey + R * .09); g.stroke(); }
+        else if ((now % 3.7) < .12) { g.lineWidth = lw * 1.3; g.beginPath(); g.moveTo(ex - R * .12, ey); g.lineTo(ex + R * .12, ey); g.stroke(); }
         else {
-          g.beginPath(); g.ellipse(ex, ey, R * .13, R * .16, 0, 0, 7); g.fill();
-          g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(ex - R * .04, ey - R * .06, R * .05, 0, 7); g.fill(); g.beginPath(); g.arc(ex + R * .05, ey + R * .06, R * .022, 0, 7); g.fill(); g.fillStyle = INK;
+          g.beginPath(); g.ellipse(ex, ey, R * .14, R * .17, 0, 0, 7); g.fill();
+          g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(ex - R * .045, ey - R * .065, R * .055, 0, 7); g.fill(); g.beginPath(); g.arc(ex + R * .05, ey + R * .07, R * .024, 0, 7); g.fill(); g.fillStyle = INK;
         }
       });
       // ほっぺ・はな・くち・ひげ
-      g.fillStyle = "rgba(255,140,160,.55)"; exs.forEach((ex) => { g.beginPath(); g.ellipse(ex - R * .05, ey + R * .3, R * .14, R * .08, 0, 0, 7); g.fill(); });
-      const nx = hx - R * .1, ny = hy + R * .22;
-      g.fillStyle = "#FF8FA3"; g.beginPath(); g.moveTo(nx - R * .07, ny); g.lineTo(nx + R * .07, ny); g.lineTo(nx, ny + R * .07); g.closePath(); g.fill();
+      exs.forEach((ex) => blush(ex - R * .05, ey + R * .32, R * .14, R * .08, lw));
+      const nx = hx - R * .1, ny = hy + R * .24;
+      g.beginPath(); g.moveTo(nx - R * .08, ny); g.lineTo(nx + R * .08, ny); g.lineTo(nx, ny + R * .08); g.closePath(); ol("#FF8FA3", lw * .7);
       g.lineWidth = lw; g.strokeStyle = INK;
-      if (punching) { g.fillStyle = "#C2445A"; g.beginPath(); g.moveTo(nx - R * .1, ny + R * .14); g.quadraticCurveTo(nx, ny + R * .36, nx + R * .1, ny + R * .14); g.closePath(); g.fill(); g.stroke(); }
-      else { g.beginPath(); g.moveTo(nx - R * .13, ny + R * .12); g.quadraticCurveTo(nx - R * .065, ny + R * .2, nx, ny + R * .1); g.quadraticCurveTo(nx + R * .065, ny + R * .2, nx + R * .13, ny + R * .12); g.stroke(); }
-      g.lineWidth = Math.max(1.5, lw * .6);
+      if (punching || pose === "ouch") { g.beginPath(); g.moveTo(nx - R * .12, ny + R * .14); g.quadraticCurveTo(nx, ny + R * .4, nx + R * .12, ny + R * .14); g.closePath(); ol("#C2445A", lw); }
+      else { g.beginPath(); g.moveTo(nx - R * .14, ny + R * .12); g.quadraticCurveTo(nx - R * .07, ny + R * .21, nx, ny + R * .1); g.quadraticCurveTo(nx + R * .07, ny + R * .21, nx + R * .14, ny + R * .12); g.stroke(); }
+      g.lineWidth = Math.max(2, lw * .6);
       [[-1, -R * .95], [1, R * .8]].forEach(([d, ox]) => [-1, 1].forEach((k) => { g.beginPath(); g.moveTo(hx + ox * .72, ny + k * R * .05); g.lineTo(hx + ox, ny - R * .02 + k * R * .1); g.stroke(); }));
-      if (pose === "ouch") for (let i = 0; i < 3; i++) { const a = now * 6 + i * 2.1; bigText("★", hx + Math.cos(a) * R * 1.1, hy - R * 1.15 + Math.sin(a) * R * .25, R * .32, "#FFC94A"); }
+      if (pose === "ouch") for (let i = 0; i < 3; i++) { const a = now * 6 + i * 2.1; sparkle(hx + Math.cos(a) * R * 1.1, hy - R * 1.15 + Math.sin(a) * R * .25, R * .2, "#FFC94A"); }
     }
     function drawObj(type, x, y, r, rot) {
-      g.save(); g.translate(x, y); g.rotate(rot); g.strokeStyle = "#3A2413"; g.lineWidth = Math.max(2.5, r * .12); g.lineJoin = "round";
+      g.save(); g.translate(x, y); g.rotate(rot);
+      const lw = Math.max(3, r * .13);
       if (type === "p") {
-        g.fillStyle = "#3FAE4A"; [-.5, 0, .5].forEach((a) => { g.save(); g.rotate(a); g.beginPath(); g.ellipse(0, -r * 1.1, r * .22, r * .5, 0, 0, 7); g.fill(); g.stroke(); g.restore(); });
-        g.fillStyle = "#D9774A"; g.beginPath(); g.moveTo(-r * .8, -r * .45); g.lineTo(r * .8, -r * .45); g.lineTo(r * .6, r * .9); g.lineTo(-r * .6, r * .9); g.closePath(); g.fill(); g.stroke();
-        g.fillStyle = "#E88D5E"; g.fillRect(-r * .95, -r * .75, r * 1.9, r * .38); g.strokeRect(-r * .95, -r * .75, r * 1.9, r * .38);
+        // は っぱ
+        [-.55, 0, .55].forEach((a) => { g.save(); g.rotate(a); g.beginPath(); g.ellipse(0, -r * 1.12, r * .24, r * .52, 0, 0, 7); ol("#4CC05A", lw); g.beginPath(); g.moveTo(0, -r * .7); g.lineTo(0, -r * 1.45); g.lineWidth = lw * .5; g.stroke(); g.restore(); });
+        // はち
+        const body = () => { g.moveTo(-r * .8, -r * .45); g.lineTo(r * .8, -r * .45); g.lineTo(r * .6, r * .9); g.lineTo(-r * .6, r * .9); g.closePath(); };
+        g.beginPath(); body(); g.fillStyle = "#E57B45"; g.fill();
+        shade(body, () => g.rect(r * .22, -r, r, r * 2), "#C45A2A");
+        g.beginPath(); body(); ol(null, lw);
+        g.beginPath(); g.rect(-r * .95, -r * .75, r * 1.9, r * .38); ol("#F2955F", lw);
+        g.fillStyle = "#FFFFFF"; g.fillRect(-r * .7, -r * .66, r * .35, r * .1);
       } else if (type === "w") {
-        g.fillStyle = "#3E9E3E"; g.beginPath(); g.ellipse(0, 0, r, r * .88, 0, 0, 7); g.fill();
-        g.strokeStyle = "#1F5A26"; g.lineWidth = r * .14; [-.5, 0, .5].forEach((d) => { g.beginPath(); g.ellipse(d * r * .9, 0, r * .12, r * .8, 0, 0, 7); g.stroke(); });
-        g.strokeStyle = "#3A2413"; g.lineWidth = Math.max(2.5, r * .1); g.beginPath(); g.ellipse(0, 0, r, r * .88, 0, 0, 7); g.stroke();
+        const body = () => g.ellipse(0, 0, r, r * .88, 0, 0, 7);
+        g.beginPath(); body(); g.fillStyle = "#4CB84F"; g.fill();
+        g.save(); g.beginPath(); body(); g.clip();
+        g.fillStyle = "#1F6B2A";
+        [-.62, 0, .62].forEach((d) => { g.beginPath(); for (let i = 0; i <= 12; i++) { const yy = -r + i * r / 6, xx = d * r + (i % 2 ? r * .1 : -r * .1); i ? g.lineTo(xx, yy) : g.moveTo(xx, yy); } for (let i = 12; i >= 0; i--) { const yy = -r + i * r / 6, xx = d * r + r * .14 + (i % 2 ? r * .1 : -r * .1); g.lineTo(xx, yy); } g.fill(); });
+        g.fillStyle = "rgba(20,60,20,.3)"; g.beginPath(); g.ellipse(r * .35, r * .3, r * .9, r * .8, 0, 0, 7); g.fill();
+        g.restore();
+        g.fillStyle = "rgba(255,255,255,.85)"; g.beginPath(); g.ellipse(-r * .45, -r * .45, r * .22, r * .1, -.6, 0, 7); g.fill();
+        g.beginPath(); body(); ol(null, lw);
+        g.beginPath(); g.moveTo(0, -r * .86); g.quadraticCurveTo(r * .05, -r * 1.15, r * .25, -r * 1.12); g.lineWidth = lw * .8; g.strokeStyle = "#5A3A20"; g.stroke();
       } else {
-        g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(0, 0, r, 0, 7); g.fill(); g.stroke();
-        g.strokeStyle = "#E0463C"; g.lineWidth = r * .14; g.beginPath(); g.arc(-r * 1.1, 0, r * .75, -.8, .8); g.stroke(); g.beginPath(); g.arc(r * 1.1, 0, r * .75, Math.PI - .8, Math.PI + .8); g.stroke();
+        g.beginPath(); g.arc(0, 0, r, 0, 7); g.fillStyle = "#FFFFFF"; g.fill();
+        shade(() => g.arc(0, 0, r, 0, 7), () => { g.rect(-r, -r, 2 * r, 2 * r); g.moveTo(-r * .12 + r * .95, -r * .12); g.arc(-r * .12, -r * .12, r * .95, 0, 7); }, "#D5DEE6");
+        g.strokeStyle = "#E0463C"; g.lineWidth = r * .12;
+        [-1, 1].forEach((d) => {
+          g.beginPath(); g.arc(d * r * 1.1, 0, r * .75, d > 0 ? Math.PI - .8 : -.8, d > 0 ? Math.PI + .8 : .8); g.stroke();
+          for (let k = -2; k <= 2; k++) { const a = (d > 0 ? Math.PI : 0) + k * .3, px = d * r * 1.1 + Math.cos(a) * r * .75, py = Math.sin(a) * r * .75; g.beginPath(); g.moveTo(px - r * .1, py - r * .06); g.lineTo(px + r * .1, py + r * .06); g.lineWidth = r * .07; g.stroke(); }
+          g.lineWidth = r * .12;
+        });
+        g.beginPath(); g.arc(0, 0, r, 0, 7); ol(null, lw);
       }
       g.restore();
     }
@@ -1057,7 +1227,7 @@ function songBgm(ev, t0, beat, nBars, style) {
       return { x: lerp(L.sx, L.hx, p), y: lerp(L.sy, L.hy, p) - Math.sin(Math.PI * clamp(p)) * arc, p };
     }
     function draw(now) {
-      L = layout(); drawDojo();
+      L = layout(); drawDojo(now);
       const pose = (now - lastBonk < .5) ? "ouch" : (now - lastPunch < .15) ? "punch" : "idle";
       drawCat(now, pose);
       if (!chart) {
@@ -1080,7 +1250,8 @@ function songBgm(ev, t0, beat, nBars, style) {
           if (n.type === "b") { // ホームラン
             const x = L.hx - t * cw * 1.2, y = L.hy - t * ch * 1.3;
             drawObj("b", x, y, r * (1 - t * .5), t * 20);
-            if (t < .5) bigText("カキーン！", L.hx - L.s * .2, L.hy - L.s * .55, Math.max(16, L.s * .13), "#E0463C");
+            motionLines(x, y, -cw * 1.2, -ch * 1.3, r * (1 - t * .5), .5);
+            if (t < .5) { burst(L.hx - L.s * .2, L.hy - L.s * .55, L.s * .3, "#FFE14D", t * 2); bigText("カキーン！", L.hx - L.s * .2, L.hy - L.s * .55, Math.max(16, L.s * .13), "#E0463C"); }
             continue;
           }
           const cols = n.type === "w" ? ["#3E9E3E", "#FF5A6E", "#FF5A6E", "#3E9E3E", "#FF5A6E"] : ["#D9774A", "#E88D5E", "#D9774A", "#3FAE4A", "#8A5A34"];
@@ -1089,12 +1260,11 @@ function songBgm(ev, t0, beat, nBars, style) {
             const a = -Math.PI / 2 - .9 + (i - 2) * .45, v = L.s * (2.4 + (i % 2) * .8), gr = L.s * 7;
             const x = L.hx + Math.cos(a) * v * t, y = L.hy + Math.sin(a) * v * t + .5 * gr * t * t;
             g.save(); g.translate(x, y); g.rotate(t * 10 * n.spin + i);
-            g.fillStyle = cols[i]; g.strokeStyle = "#3A2413"; g.lineWidth = 2.5;
-            g.beginPath(); g.moveTo(-r * .45, -r * .3); g.lineTo(r * .5, -r * .2); g.lineTo(r * .1, r * .45); g.closePath(); g.fill(); g.stroke();
+            g.beginPath(); g.moveTo(-r * .45, -r * .3); g.lineTo(r * .5, -r * .2); g.lineTo(r * .1, r * .45); g.closePath(); ol(cols[i], Math.max(3, r * .12));
             g.restore();
           }
           g.globalAlpha = 1;
-          if (t < .35) { const sc = 1 + (1 - t / .35) * .4; bigText(n.type === "w" ? "ボコッ！" : "パカーン！", L.hx - L.s * .2, L.hy - L.s * .55, Math.max(16, L.s * .13), "#E0463C", sc); }
+          if (t < .35) { const sc = 1 + (1 - t / .35) * .4; burst(L.hx - L.s * .2, L.hy - L.s * .55, L.s * .3 * sc, n.grade === "bacchiri" ? "#FFE14D" : "#FFF3C4", n.spin * .2); bigText(n.type === "w" ? "ボコッ！" : "パカーン！", L.hx - L.s * .2, L.hy - L.s * .55, Math.max(16, L.s * .13), "#E0463C", sc); }
           continue;
         }
         let { x, y, p } = objPos(n, now), rot = (now - n.throwT) * 6 * n.spin;
@@ -1103,7 +1273,8 @@ function songBgm(ev, t0, beat, nBars, style) {
           x = L.hx + L.s * .35 + t * L.s * .4; y = L.hy + (t * t) * L.s * 8 - t * L.s * 1.2; y = Math.min(y, L.floorY - r);
         }
         // かげ
-        g.fillStyle = "rgba(58,36,19,.18)"; g.beginPath(); g.ellipse(x, L.floorY + 4, r * (.6 + .4 * clamp(p)), r * .18, 0, 0, 7); g.fill();
+        g.fillStyle = "rgba(36,23,15,.2)"; g.beginPath(); g.ellipse(x, L.floorY + 4, r * (.6 + .4 * clamp(p)), r * .18, 0, 0, 7); g.fill();
+        if (p <= 1) { const q = objPos(n, now - .03); motionLines(x, y, x - q.x, y - q.y, r, .4); }
         drawObj(n.type, x, y, r, rot);
       }
     }
@@ -1138,9 +1309,9 @@ function songBgm(ev, t0, beat, nBars, style) {
       3: [{ sp: 1, rest: 3 }, { sp: 1, rest: 2 }, { sp: 2, rest: 3 }, { sp: 3, rest: 5 }, { sp: 1, rest: 5 }, { sp: 3, rest: 3 }]
     };
     const PAL = [
-      { body: "#86D65B", belly: "#FFF6D8", flower: "#FF9EC4" },   // キミ
-      { body: "#6FD1A4", belly: "#F1FFF6", flower: "#FFD447" },   // なかま1
-      { body: "#B7DE5E", belly: "#FFFBE0", flower: "#8EC5FF" }    // なかま2
+      { body: "#86D65B", shade: "#5FB43A", belly: "#FFF6D8", flower: "#FF9EC4" },   // キミ
+      { body: "#6FD1A4", shade: "#48B083", belly: "#F1FFF6", flower: "#FFD447" },   // なかま1
+      { body: "#B7DE5E", shade: "#93BE3A", belly: "#FFFBE0", flower: "#8EC5FF" }    // なかま2
     ];
     let jumpAt = -9, lastBonk = -9, L = null;
     const snd = {
@@ -1187,18 +1358,53 @@ function songBgm(ev, t0, beat, nBars, style) {
       return { s, waterY, frogX, step, ringY: waterY - s * 1.5, ry: s * .62, rx: s * .24, frogs: [frogX, frogX + step, frogX + 2 * step] };
     }
     function drawBg(now) {
-      const { waterY } = L;
-      const sky = g.createLinearGradient(0, 0, 0, waterY); sky.addColorStop(0, "#AEDFFF"); sky.addColorStop(1, "#E8F7FF");
-      g.fillStyle = sky; g.fillRect(0, 0, cw, waterY);
-      g.fillStyle = "rgba(255,255,255,.9)";
-      [[.2, .12], [.7, .22]].forEach(([fx, fy], i) => { const x = ((fx * cw + now * (10 + i * 6)) % (cw + 160)) - 80, y = fy * ch, r = 16;
-        g.beginPath(); g.arc(x, y, r, 0, 7); g.arc(x + r * 1.1, y - r * .4, r * 1.2, 0, 7); g.arc(x + r * 2.3, y, r, 0, 7); g.fill(); });
-      g.fillStyle = "#9ED28A"; g.beginPath(); g.moveTo(0, waterY); g.quadraticCurveTo(cw * .3, waterY - ch * .16, cw * .6, waterY - ch * .04); g.quadraticCurveTo(cw * .85, waterY - ch * .12, cw, waterY - ch * .05); g.lineTo(cw, waterY); g.fill();
-      g.fillStyle = "#5FB6E6"; g.fillRect(0, waterY, cw, ch - waterY);
-      g.strokeStyle = "#8FD0F2"; g.lineWidth = 3;
-      for (let i = 0; i < 6; i++) { const y = waterY + 14 + i * 16, off = (now * 20 + i * 40) % 80; g.beginPath(); for (let x = -80 + off; x < cw; x += 80) { g.moveTo(x, y); g.quadraticCurveTo(x + 20, y - 5, x + 40, y); } g.stroke(); }
-      g.fillStyle = "#5CB85C"; g.strokeStyle = "#2F6B2F"; g.lineWidth = 3;
-      L.frogs.forEach((fx) => { g.beginPath(); g.ellipse(fx, waterY + 6, L.s * .6, L.s * .15, 0, .25, Math.PI * 2 - .05); g.lineTo(fx, waterY + 6); g.closePath(); g.fill(); g.stroke(); });
+      const { waterY, s } = L;
+      // そら（2だんの ベタぬり）
+      g.fillStyle = "#9FD8FF"; g.fillRect(0, 0, cw, waterY);
+      g.fillStyle = "#C4E8FF"; g.fillRect(0, waterY * .45, cw, waterY * .55);
+      // おひさま
+      const sx0 = cw * .86, sy0 = Math.max(34, ch * .09), sr = Math.max(18, s * .28);
+      g.save(); g.translate(sx0, sy0); g.rotate(now * .3);
+      for (let i = 0; i < 10; i++) { g.rotate(Math.PI / 5); g.beginPath(); g.moveTo(sr * 1.25, -sr * .14); g.lineTo(sr * 1.65, 0); g.lineTo(sr * 1.25, sr * .14); g.closePath(); ol("#FFC94A", 2.5); }
+      g.restore();
+      g.beginPath(); g.arc(sx0, sy0, sr, 0, 7); ol("#FFD84D", 3.5);
+      g.fillStyle = "rgba(255,255,255,.8)"; g.beginPath(); g.arc(sx0 - sr * .35, sy0 - sr * .35, sr * .18, 0, 7); g.fill();
+      // くも
+      [[.2, .12], [.62, .22]].forEach(([fx, fy], i) => {
+        const x = ((fx * cw + now * (10 + i * 6)) % (cw + 160)) - 80, y = fy * ch, r = 16;
+        const cloud = () => { g.moveTo(x + r, y); g.arc(x, y, r, 0, 7); g.moveTo(x + r * 2.3, y - r * .4); g.arc(x + r * 1.1, y - r * .4, r * 1.2, 0, 7); g.moveTo(x + r * 3.3, y); g.arc(x + r * 2.3, y, r, 0, 7); g.rect(x, y - r * .2, r * 2.3, r * 1.2); };
+        g.beginPath(); cloud(); g.lineWidth = 7; g.strokeStyle = INK; g.stroke();
+        g.beginPath(); cloud(); g.fillStyle = "#FFFFFF"; g.fill();
+        g.fillStyle = "#DCEFFF"; g.beginPath(); g.ellipse(x + r * 1.15, y + r * .75, r * 1.9, r * .28, 0, 0, 7); g.fill();
+      });
+      // おか（2まい）
+      const hill = (pts, col) => { g.beginPath(); g.moveTo(-4, waterY); pts.forEach(([a, b, c, d]) => g.quadraticCurveTo(a * cw, waterY - b * ch, c * cw, waterY - d * ch)); g.lineTo(cw + 4, waterY); g.closePath(); ol(col, 3); };
+      hill([[.2, .2, .45, .1], [.75, .02, 1.02, .14]], "#B8E39C");
+      hill([[.3, .16, .6, .04], [.85, .12, 1.02, .05]], "#8FD06F");
+      // ガマの ほ（はしっこで ゆらゆら）
+      [[cw * .03, 1], [cw * .07, .8], [cw * .95, .95], [cw * .99, .75]].forEach(([x, k], i) => {
+        const h = s * 1.3 * k, sw = Math.sin(now * 1.6 + i) * s * .06, tx = x + sw, ty = waterY - h;
+        g.beginPath(); g.moveTo(x, waterY + 4); g.quadraticCurveTo(x, waterY - h * .5, tx, ty - s * .1); g.lineWidth = 7; g.strokeStyle = INK; g.stroke(); g.lineWidth = 3.5; g.strokeStyle = "#4E9E36"; g.stroke();
+        g.beginPath(); g.ellipse(tx, ty + s * .08, s * .06, s * .17, sw / s, 0, 7); ol("#8A5A34", 3);
+      });
+      // いけ
+      g.fillStyle = "#58B4E8"; g.fillRect(0, waterY, cw, ch - waterY);
+      g.fillStyle = "#7CC8F0"; g.fillRect(0, waterY, cw, 10);
+      g.strokeStyle = INK; g.lineWidth = 3; g.beginPath(); g.moveTo(0, waterY); g.lineTo(cw, waterY); g.stroke();
+      g.strokeStyle = "rgba(255,255,255,.75)"; g.lineWidth = 3; g.lineCap = "round";
+      for (let i = 0; i < 6; i++) { const y = waterY + 20 + i * 16, off = (now * 20 + i * 40) % 90; g.beginPath(); for (let x = -90 + off + (i % 2) * 45; x < cw; x += 90) { g.moveTo(x, y); g.quadraticCurveTo(x + 10, y - 4, x + 22, y); } g.stroke(); }
+      // ハスの は（切れこみ つき）
+      const pad = (fx, w) => {
+        const y = waterY + 6, a0 = -Math.PI / 2 + .25, a1 = -Math.PI / 2 - .25 + Math.PI * 2;
+        g.beginPath(); g.moveTo(fx, y); g.ellipse(fx, y, w, w * .26, 0, a0, a1); g.closePath(); ol("#5CB85C", 3);
+        g.strokeStyle = "#3E8E3E"; g.lineWidth = 2;
+        [.2, .9, 1.6, 2.4, 2.95].forEach((a) => { g.beginPath(); g.moveTo(fx, y); g.lineTo(fx + Math.cos(a) * w * .8, y + Math.sin(a) * w * .8 * .26); g.stroke(); });
+      };
+      L.frogs.forEach((fx) => pad(fx, L.s * .6));
+      // ハスの 花（すみっこ）
+      const lx = cw * .9, ly = waterY + (ch - waterY) * .55;
+      pad(lx, L.s * .45);
+      [-1, 0, 1].forEach((k) => { g.save(); g.translate(lx + k * L.s * .1, ly - (ch - waterY) * .55 + 2); g.rotate(k * .5); g.beginPath(); g.ellipse(0, -L.s * .1, L.s * .07, L.s * .14, 0, 0, 7); ol("#FF9EC4", 2.5); g.restore(); });
     }
     const JUMP = .38, jumpP = (ja, now) => { const jt = now - ja; return jt >= 0 && jt < JUMP ? jt / JUMP : -1; };
     function drawFrog(x, now, mood, ja, pal) {
@@ -1207,39 +1413,53 @@ function songBgm(ev, t0, beat, nBars, style) {
       const off = jp >= 0 ? -4 * H * jp * (1 - jp) : 0;
       const beatSq = chart && playing ? Math.abs(Math.sin(Math.PI * ((now - chart.t0) / chart.beat))) * .05 : Math.abs(Math.sin(now * 3 + x)) * .03;
       const sy = jp >= 0 ? 1.08 : 1 - beatSq, sx = 1 / Math.sqrt(sy);
-      const by = waterY - s * .3 + off, lw = Math.max(2.5, s * .03);
+      const by = waterY - s * .3 + off, lw = Math.max(3, s * .04);
+      // はっぱの うえの かげ（とぶと 小さく）
+      const sk = 1 - clamp(-off / H) * .6;
+      g.fillStyle = "rgba(20,70,30,.35)"; g.beginPath(); g.ellipse(x, waterY + 2, s * .32 * sk, s * .07 * sk, 0, 0, 7); g.fill();
       g.save(); g.translate(x, by); g.scale(sx, sy);
-      g.lineJoin = "round"; g.lineCap = "round"; g.strokeStyle = "#3A2413"; g.lineWidth = lw;
-      g.fillStyle = pal.body;
+      g.lineJoin = "round"; g.lineCap = "round"; g.strokeStyle = INK; g.lineWidth = lw;
+      const toes = (tx, ty, d) => { g.fillStyle = pal.body; [-1, 0, 1].forEach((k) => { g.beginPath(); g.arc(tx + k * s * .045 + d * s * .02, ty, s * .028, 0, 7); ol(pal.body, lw * .6); }); };
       if (jp >= 0) {
-        [-1, 1].forEach((d) => { g.beginPath(); g.ellipse(d * s * .13, s * .36, s * .07, s * .15, d * .25, 0, 7); g.fill(); g.stroke(); });
-        [-1, 1].forEach((d) => { g.beginPath(); g.ellipse(d * s * .34, -s * .02, s * .06, s * .12, -d * .9, 0, 7); g.fill(); g.stroke(); });
-      } else [-1, 1].forEach((d) => { g.beginPath(); g.ellipse(d * s * .2, s * .27, s * .13, s * .07, 0, 0, 7); g.fill(); g.stroke(); });
-      g.beginPath(); g.ellipse(0, s * .14, s * .27, s * .2, 0, 0, 7); g.fill(); g.stroke();
-      g.fillStyle = pal.belly; g.beginPath(); g.ellipse(0, s * .18, s * .16, s * .12, 0, 0, 7); g.fill();
-      g.fillStyle = pal.body; g.beginPath(); g.ellipse(0, -s * .1, s * .42, s * .28, 0, 0, 7); g.fill(); g.stroke();
+        [-1, 1].forEach((d) => { g.beginPath(); g.ellipse(d * s * .13, s * .36, s * .07, s * .15, d * .25, 0, 7); ol(pal.body, lw); toes(d * s * .16, s * .5, d); });
+        [-1, 1].forEach((d) => { g.beginPath(); g.ellipse(d * s * .34, -s * .02, s * .06, s * .12, -d * .9, 0, 7); ol(pal.body, lw); });
+      } else [-1, 1].forEach((d) => { g.beginPath(); g.ellipse(d * s * .2, s * .27, s * .14, s * .075, 0, 0, 7); ol(pal.body, lw); toes(d * s * .3, s * .3, d); });
+      // からだ
+      const body = () => g.ellipse(0, s * .14, s * .27, s * .2, 0, 0, 7);
+      g.beginPath(); body(); g.fillStyle = pal.body; g.fill();
+      shade(body, () => g.rect(-s * .3, s * .22, s * .6, s * .2), pal.shade);
+      g.beginPath(); body(); ol(null, lw);
+      g.fillStyle = pal.belly; g.beginPath(); g.ellipse(0, s * .17, s * .15, s * .11, 0, 0, 7); g.fill();
+      // あたま
+      const head = () => g.ellipse(0, -s * .1, s * .42, s * .28, 0, 0, 7);
+      g.beginPath(); head(); g.fillStyle = pal.body; g.fill();
+      shade(head, () => { g.rect(-s * .5, -s * .5, s, s * .8); g.moveTo(s * .42, -s * .15); g.ellipse(0, -s * .15, s * .42, s * .26, 0, 0, 7); }, pal.shade);
+      g.beginPath(); head(); ol(null, lw);
       [-1, 1].forEach((d) => {
         const ex = d * s * .21, ey = -s * .33;
-        g.fillStyle = pal.body; g.beginPath(); g.arc(ex, ey, s * .14, Math.PI * .92, Math.PI * 2.08); g.fill(); g.stroke();
-        g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(ex, ey, s * .105, 0, 7); g.fill();
-        g.fillStyle = "#3A2413";
-        if (mood === "bonk") { g.beginPath(); g.moveTo(ex - s * .05, ey - s * .04); g.lineTo(ex + s * .05, ey + s * .04); g.moveTo(ex + s * .05, ey - s * .04); g.lineTo(ex - s * .05, ey + s * .04); g.stroke(); }
+        g.beginPath(); g.arc(ex, ey, s * .145, Math.PI * .92, Math.PI * 2.08); ol(pal.body, lw);
+        g.beginPath(); g.arc(ex, ey, s * .105, 0, 7); ol("#FFFFFF", lw * .6);
+        g.fillStyle = INK;
+        if (mood === "bonk") { g.lineWidth = lw; g.beginPath(); g.moveTo(ex - s * .05, ey - s * .05); g.lineTo(ex + s * .05, ey + s * .05); g.moveTo(ex + s * .05, ey - s * .05); g.lineTo(ex - s * .05, ey + s * .05); g.stroke(); }
         else if (mood === "happy") { g.lineWidth = lw * 1.2; g.beginPath(); g.arc(ex, ey + s * .03, s * .055, Math.PI * 1.1, Math.PI * 1.9); g.stroke(); g.lineWidth = lw; }
+        else if ((now + x * .01) % 3.1 < .1) { g.lineWidth = lw; g.beginPath(); g.moveTo(ex - s * .07, ey); g.lineTo(ex + s * .07, ey); g.stroke(); }
         else {
-          g.beginPath(); g.arc(ex + d * s * .01, ey + s * .01, s * .075, 0, 7); g.fill();
+          g.beginPath(); g.arc(ex + d * s * .01, ey + s * .01, s * .07, 0, 7); g.fill();
           g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(ex + d * s * .01 - s * .025, ey - s * .02, s * .027, 0, 7); g.fill();
           g.beginPath(); g.arc(ex + d * s * .01 + s * .025, ey + s * .03, s * .012, 0, 7); g.fill();
         }
       });
-      g.fillStyle = mood === "happy" ? "rgba(255,120,150,.8)" : "rgba(255,140,160,.6)";
-      [-1, 1].forEach((d) => { g.beginPath(); g.ellipse(d * s * .27, -s * .03, s * .07, s * .045, 0, 0, 7); g.fill(); });
-      if (mood === "bonk") { g.fillStyle = "#C2445A"; g.beginPath(); g.ellipse(0, -s * .02, s * .045, s * .04, 0, 0, 7); g.fill(); g.stroke(); }
-      else if (mood === "happy" || jp >= 0) { g.fillStyle = "#C2445A"; g.beginPath(); g.moveTo(-s * .07, -s * .05); g.quadraticCurveTo(0, s * .06, s * .07, -s * .05); g.closePath(); g.fill(); g.stroke(); }
-      else { g.beginPath(); g.moveTo(-s * .06, -s * .045); g.quadraticCurveTo(-s * .03, -s * .01, 0, -s * .04); g.quadraticCurveTo(s * .03, -s * .01, s * .06, -s * .045); g.stroke(); }
+      [-1, 1].forEach((d) => blush(d * s * .28, -s * .02, s * .07, s * .04, lw, mood === "happy" ? .8 : .55));
+      g.lineWidth = lw;
+      if (mood === "bonk") { g.beginPath(); g.ellipse(0, -s * .02, s * .05, s * .045, 0, 0, 7); ol("#C2445A", lw); }
+      else if (mood === "happy" || jp >= 0) {
+        g.beginPath(); g.moveTo(-s * .16, -s * .07); g.quadraticCurveTo(0, s * .1, s * .16, -s * .07); g.closePath(); ol("#C2445A", lw);
+        g.save(); g.clip(); g.fillStyle = "#FF8FA3"; g.beginPath(); g.ellipse(0, s * .03, s * .07, s * .04, 0, 0, 7); g.fill(); g.restore();
+      }
+      else { g.beginPath(); g.moveTo(-s * .17, -s * .07); g.quadraticCurveTo(0, s * .01, s * .17, -s * .07); g.stroke(); }
       const fx = s * .1, fy = -s * .4;
-      g.fillStyle = pal.flower; g.lineWidth = lw * .7;
-      for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5 + now * .5; g.beginPath(); g.ellipse(fx + Math.cos(a) * s * .045, fy + Math.sin(a) * s * .045, s * .04, s * .028, a, 0, 7); g.fill(); g.stroke(); }
-      g.fillStyle = "#FFFFFF"; g.beginPath(); g.arc(fx, fy, s * .025, 0, 7); g.fill();
+      for (let i = 0; i < 5; i++) { const a = i * Math.PI * 2 / 5 + now * .5; g.beginPath(); g.ellipse(fx + Math.cos(a) * s * .045, fy + Math.sin(a) * s * .045, s * .042, s * .03, a, 0, 7); ol(pal.flower, lw * .6); }
+      g.beginPath(); g.arc(fx, fy, s * .026, 0, 7); ol("#FFF3A0", lw * .5);
       g.restore();
     }
     // わっかは 止まらず 一定の速さ。パ→画面の右はし、プ→なかま2、ペ→なかま1、ポ→キミ の まえを とおる
@@ -1253,10 +1473,11 @@ function songBgm(ev, t0, beat, nBars, style) {
       g.save(); g.translate(x, y); g.rotate(wob); g.scale(sx * sc, sc);
       const a0 = front ? -Math.PI / 2 : Math.PI / 2, a1 = front ? Math.PI / 2 : Math.PI * 1.5;
       g.lineCap = "butt";
-      g.strokeStyle = "#3A2413"; g.lineWidth = ry * .26; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, a0, a1); g.stroke();
+      g.strokeStyle = INK; g.lineWidth = ry * .3; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, a0, a1); g.stroke();
       g.strokeStyle = c1; g.lineWidth = ry * .18; g.beginPath(); g.ellipse(0, 0, rx, ry, 0, a0, a1); g.stroke();
       g.strokeStyle = c2; g.lineWidth = ry * .18; g.setLineDash([ry * .16, ry * .22]); g.beginPath(); g.ellipse(0, 0, rx, ry, 0, a0, a1); g.stroke(); g.setLineDash([]);
-      if (n.state === "hit" && now - n.at < .5) for (let i = 0; i < 6; i++) { const a = i * 1.05 + (now - n.at) * 4, rr = ry * (1 + (now - n.at) * 1.5); bigText("✦", Math.cos(a) * rr * .6, Math.sin(a) * rr, ry * .25, "#F59F00"); }
+      g.strokeStyle = "rgba(255,255,255,.7)"; g.lineWidth = ry * .04; g.beginPath(); g.ellipse(0, 0, rx - ry * .05, ry * .95, 0, a0, a1); g.stroke();
+      if (n.state === "hit" && now - n.at < .5) for (let i = 0; i < 6; i++) { const a = i * 1.05 + (now - n.at) * 4, rr = ry * (1 + (now - n.at) * 1.5); sparkle(Math.cos(a) * rr * .6, Math.sin(a) * rr, ry * .16, "#FFD43B"); }
       g.restore();
     }
     function drawSylBar(now, n) {
