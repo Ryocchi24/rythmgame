@@ -496,13 +496,15 @@ function songBgm(ev, t0, beat, nBars, style) {
   function finish() {
     const all = chart.notes, cnt = { bacchiri: 0, ok: 0, oshii: 0, miss: 0 };
     all.forEach((n) => cnt[n.grade || "miss"]++);
-    // バッチリでも ずれた ぶんだけ 少し へる → ぜんぶ ど真ん中で やっと 100点
+    // バッチリでも ずれた ぶんだけ 少し へる（ほかの 判定が まざった ときの 差を つけるため）
     const pts = { ok: 55, oshii: 20, miss: 0 };
     const J = JUDGE;
     const pt = (n) => n.grade === "bacchiri" ? 100 - 12 * clamp((n.dev || 0) / J.p) : pts[n.grade || "miss"];
     const raw = all.reduce((s, n) => s + pt(n), 0) - strays * STRAY_PENALTY;
     let score = Math.max(0, Math.floor(raw / Math.max(1, all.length)));
-    if (score >= 100 && !(strays === 0 && all.every((n) => n.grade === "bacchiri"))) score = 99;
+    // ぜんぶ バッチリ ＆ からぶり 0 なら かならず 100点。それ以外は 99点まで
+    const perfect = all.length > 0 && strays === 0 && all.every((n) => n.grade === "bacchiri");
+    score = perfect ? 100 : Math.min(99, score);
     $("tStray").textContent = strays;
     playing = false; clearInterval(schedTimer); quitBtn.hidden = true;
     $("resScore").innerHTML = score + "<small>てん</small>";
